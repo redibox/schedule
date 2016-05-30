@@ -1,11 +1,11 @@
 {
-  "name": "redibox-hook-cache",
+  "name": "redibox-hook-schedule",
   "description": "Advanced redibox powered caching",
   "version": "1.0.0",
   "main": "lib/index.js",
   "author": "Mike Diarmid",
   "repository": {
-    "github": "https://github.com/redibox/scheduler"
+    "github": "https://github.com/redibox/schedule"
   },
   "license": "MIT",
   "engines": {
@@ -13,7 +13,7 @@
   },
   "redibox": {
     "hook": true,
-    "name": "scheduler"
+    "name": "schedule"
   },
   "keywords": [
     "redis",
