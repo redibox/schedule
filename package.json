@@ -1,6 +1,6 @@
 {
   "name": "redibox-hook-schedule",
-  "description": "Advanced redibox powered caching",
+  "description": "Advanced redibox powered scheduling",
   "version": "1.0.0",
   "main": "lib/index.js",
   "author": "Mike Diarmid",
