@@ -1,15 +1,15 @@
 global.HOOK_NAME = 'schedule';
-import Redibox from 'redibox';
-import UserHook from './../src/hook';
+const Redibox = require('redibox').default;
+const UserHook = require('./lib/hook').default;
 
 global.some = {
   coolFunction(data) {
     console.log('COOL');
-    console.dir(data);
+    return Promise.resolve();
   },
   unCoolFunc(data) {
     console.log('UNCOOL');
-    console.dir(data);
+    return Promise.reject(new Error('Woops'));
   },
 };
 
@@ -19,20 +19,20 @@ const config = {
       {
         runs: 'some.coolFunction',
         data: { live: true },
-        interval: 'every 15 seconds',
+        interval: 'every 5 seconds',
       },
       {
         runs: 'some.unCoolFunc',
         data: { live: true },
-        interval: 'every 30 seconds',
+        interval: 'every 15 seconds',
       },
     ],
-  },
+  }, log: { level: 'info'},
 };
 config.hooks[global.HOOK_NAME] = UserHook;
 
 const clusterConfig = {
-  log: { level: 'error' },
+  log: { level: 'info' },
   redis: {
     connectionTimeout: 2000,
     hosts: [
@@ -67,23 +67,7 @@ const clusterConfig = {
 
 clusterConfig.hooks[global.HOOK_NAME] = UserHook;
 
-before(done => {
-  global.RediBox = new Redibox(config, () => {
-    global.Hook = RediBox.hooks[global.HOOK_NAME];
-    global.RediBoxCluster = new Redibox(clusterConfig, () => {
-      global.HookCluster = global.RediBoxCluster.hooks[global.HOOK_NAME];
-      done();
-    });
-  });
-});
+global.RediBox = new Redibox(config, () => {
+  global.Hook = RediBox.hooks[global.HOOK_NAME];
 
-beforeEach(() => {
-  Promise.all([
-    RediBox.client.flushall(),
-    RediBoxCluster.cluster.flushall(),
-  ]);
-});
-
-after(() => {
-  RediBox.disconnect();
 });
