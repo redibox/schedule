@@ -40,7 +40,6 @@ export default class Scheduler extends BaseHook {
           .then(this.successLogger.bind(this, schedule))
           .catch(this.errorLogger.bind(this, schedule));
       });
-
   }
 
   /**
