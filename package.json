@@ -67,7 +67,7 @@
     "isparta": "^4.0.0",
     "istanbul": "^1.0.0-alpha.2",
     "mocha": "^2.4.5",
-    "redibox": "git+https://github.com/redibox/core.git",
+    "redibox": "^2.0.1",
     "sinon": "^1.17.4"
   },
   "dependencies": {
