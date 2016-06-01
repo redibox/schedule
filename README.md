@@ -6,3 +6,5 @@
 [![License](https://img.shields.io/npm/l/redibox-hook-cache.svg)](/LICENSE)
 
 ## RediBox Schedule
+
+Just a quick scheduler PoC - deffo not using in production 🙄
