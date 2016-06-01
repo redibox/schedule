@@ -12,6 +12,10 @@ export default class Scheduler extends BaseHook {
    * @returns {Promise.<T>}
    */
   initialize() {
+    if (!this.options.schedules || !this.options.schedules.length) {
+      return Promise.resolve();
+    }
+    
     for (let i = 0, len = this.options.schedules.length; i < len; i++) {
       const schedule = this.options.schedules[i];
       this.options.laterSchedules[i] = later.parse.text(schedule.interval);
