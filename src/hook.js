@@ -51,7 +51,7 @@ export default class Scheduler extends BaseHook {
    * @param schedule
    */
   successLogger(schedule) {
-    this.log.info(`${getTimeStamp()}: Schedule for '${schedule.runs}' ${ schedule.data ? JSON.stringify(schedule.data) : null } has completed successfully.`);
+    this.log.info(`${getTimeStamp()}: Schedule for '${schedule.runs}' ${schedule.data ? JSON.stringify(schedule.data) : null} has completed successfully.`);
   }
 
   /**
@@ -60,7 +60,7 @@ export default class Scheduler extends BaseHook {
    * @param error
    */
   errorLogger(schedule, error) {
-    this.log.error(`${getTimeStamp()}: Schedule for '${schedule.runs}' ${ schedule.data ? JSON.stringify(schedule.data) : null } has failed to complete.`);
+    this.log.error(`${getTimeStamp()}: Schedule for '${schedule.runs}' ${schedule.data ? JSON.stringify(schedule.data) : null} has failed to complete.`);
     this.log.error(error);
   }
 
