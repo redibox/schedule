@@ -24,6 +24,7 @@ export default class Scheduler extends BaseHook {
         this.options.laterSchedules[i]
       );
     }
+
     return Promise.resolve();
   }
 
@@ -32,18 +33,32 @@ export default class Scheduler extends BaseHook {
    * @param i
    */
   scheduleWrapper(i) {
-    return this
+    const schedule = this.options.schedules[i];
+
+    // 'multi' skips 'single instance only' run checks across servers
+    // useful for jobs you want to run on every server not just once per cluster per X time
+    if (schedule.multi) return this.execSchedule(schedule);
+
+    return this // very crude lock - TODO redlock this
       .client
       .set(this.core.toKey(`schedules:${i}`), i, 'NX', 'EX', this.options.minInterval)
       .then(res => {
         if (!res) return Promise.resolve();
-        const schedule = this.options.schedules[i];
-        if (!schedule.runs) throw new Error('Schedule is missing a runs parameter.');
-        const runner = deepGet(global, schedule.runs);
-        return runner(schedule)
-          .then(this.successLogger.bind(this, schedule))
-          .catch(this.errorLogger.bind(this, schedule));
+        return this.execSchedule(schedule);
       });
+  }
+
+  /**
+   *
+   * @param schedule
+   * @returns {Promise}
+   */
+  execSchedule(schedule) {
+    if (!schedule.runs) throw new Error('Schedule is missing a runs parameter.');
+    const runner = deepGet(global, schedule.runs);
+    return runner(schedule)
+      .then(this.successLogger.bind(this, schedule))
+      .catch(this.errorLogger.bind(this, schedule));
   }
 
   /**
