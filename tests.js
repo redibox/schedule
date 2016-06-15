@@ -26,6 +26,11 @@ const config = {
         data: { live: true },
         interval: 'every 15 seconds',
       },
+      {
+        runs: 'some.doNotExist',
+        data: { live: true },
+        interval: 'every 5 seconds',
+      },
     ],
   }, log: { level: 'info'},
 };

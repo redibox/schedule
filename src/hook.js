@@ -1,6 +1,6 @@
 import later from 'later';
 import defaults from './defaults';
-import { BaseHook, deepGet, getTimeStamp } from 'redibox';
+import { BaseHook, deepGet, getTimeStamp, isFunction } from 'redibox';
 
 export default class Scheduler extends BaseHook {
   constructor() {
@@ -54,8 +54,11 @@ export default class Scheduler extends BaseHook {
    * @returns {Promise}
    */
   execSchedule(schedule) {
-    if (!schedule.runs) throw new Error('Schedule is missing a runs parameter.');
+    if (!schedule.runs) throw new Error(`Schedule is missing a runs parameter - ${JSON.stringify(schedule)}`);
     const runner = deepGet(global, schedule.runs);
+    if (!isFunction(runner)) {
+      return this.log.error(`Schedule invalid, expected a function at 'global.${schedule.runs}' - ${JSON.stringify(schedule)}`);
+    }
     return runner(schedule)
       .then(this.successLogger.bind(this, schedule))
       .catch(this.errorLogger.bind(this, schedule));
