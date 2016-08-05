@@ -35,15 +35,15 @@ export default class Scheduler extends BaseHook {
   scheduleWrapper(i) {
     const schedule = this.options.schedules[i];
 
-    // 'multi' skips 'single instance only' run checks across servers
+    // 'multi' or 'noLock' skips 'single instance only' run checks across servers
     // useful for jobs you want to run on every server not just once per cluster per X time
-    if (schedule.multi) return this.execSchedule(schedule);
+    if (schedule.multi || schedule.noLock) return this.execSchedule(schedule);
 
     return this // very crude lock - TODO redlock this
       .client
       .set(this.core.toKey(`schedules:${i}`), i, 'NX', 'EX', this.options.minInterval)
       .then(res => {
-        if (!res && !schedule.noLock) return Promise.resolve();
+        if (!res) return Promise.resolve();
         return this.execSchedule(schedule);
       });
   }
