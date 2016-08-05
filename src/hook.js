@@ -43,7 +43,7 @@ export default class Scheduler extends BaseHook {
       .client
       .set(this.core.toKey(`schedules:${i}`), i, 'NX', 'EX', this.options.minInterval)
       .then(res => {
-        if (!res) return Promise.resolve();
+        if (!res && !schedule.noLock) return Promise.resolve();
         return this.execSchedule(schedule);
       });
   }
