@@ -71,7 +71,7 @@
     "sinon": "^1.17.4"
   },
   "dependencies": {
-    "bluebird": "^3.3.5",
+    "bluebird": "^3.4.6",
     "later": "^1.2.0"
   }
 }
