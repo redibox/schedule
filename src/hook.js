@@ -55,11 +55,20 @@ export default class Scheduler extends BaseHook {
    */
   execSchedule(schedule) {
     if (!schedule.runs) throw new Error(`Schedule is missing a runs parameter - ${JSON.stringify(schedule)}`);
-    const runner = deepGet(global, schedule.runs);
+    const runner = typeof schedule.runs === 'string' ? deepGet(global, schedule.runs) : schedule.runs;
+
     if (!isFunction(runner)) {
-      return this.log.error(`Schedule invalid, expected a function at 'global.${schedule.runs}' - ${JSON.stringify(schedule)}`);
+      return this.log.error(`Schedule invalid, expected a function or a global string dot notated path to a function - ${JSON.stringify(schedule)}`);
     }
-    return runner(schedule)
+
+    const possiblePromise = runner(schedule);
+
+    if (!possiblePromise.then) {
+      if (possiblePromise && possiblePromise.stack) return this.errorLogger(possiblePromise, schedule);
+      return this.successLogger(schedule);
+    }
+
+    return possiblePromise
       .then(this.successLogger.bind(this, schedule))
       .catch(this.errorLogger.bind(this, schedule));
   }
