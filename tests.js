@@ -32,7 +32,7 @@ const config = {
         interval: 'every 5 seconds',
       },
     ],
-  }, log: { level: 'info'},
+  }, log: { level: 'info' },
 };
 config.hooks[global.HOOK_NAME] = UserHook;
 
