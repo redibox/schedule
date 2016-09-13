@@ -7,4 +7,69 @@
 
 ## RediBox Schedule
 
-Just a quick scheduler PoC - deffo not using in production 🙄
+Allows functions to run at set times, taking into consideration multi-server environments for hassle free scheduling.
+
+### Installation
+
+First ensure you have [RediBox](https://github.com/redibox/core) install.
+
+Install Schedule via npm: 
+
+`npm install redibox-hook-schedule --save`
+
+### Usage
+
+#### Configure schedules
+
+Within your `redibox` config, we'll setup a new `schedule` object containing a `schedules` array. Each set item consists of a `runs` function, `data` and an `interval`.
+
+- **runs**: A function or string (which returns a function).
+- **data**: A Primitive value or Object/Array.
+- **interval**: A string of the interval time, compatible with (Later)(https://bunkat.github.io/later/parsers.html#text).
+
+```
+{
+  schedule: {
+    schedules: [
+      runs: function(scheule) {
+        // Do something every 5 minutes
+        console.log('The value of foo is: ' + scheule.data.foo);
+      },
+      data: {
+        foo: 'bar',
+      },
+      interval: 'every 5 minutes',
+    ],
+  },
+}
+```
+
+#### Accessing schedule data
+
+If passing in a function directly (like above), the schedule is bound to the `runs` function as the first argument, where the data can be access via `schedule.data`.
+
+If the value of `runs` is a globally accessible function, the schedule is bound to the function directly (as `this`). For example:
+
+```
+...
+runs: 'global.someDirectory.someFile',
+data: {
+  foo: 'bar',
+},
+...
+```
+
+```
+// global.someDirectory.someFile
+export default function() {
+ console.log('The value of foo is: ' + this.data.foo);
+}
+```
+
+### Multi-server environments
+
+Typically a large application will deploy many servers running the same code base. As expected the schedule will run on each individual server. If you have 20 servers deployed, and a schedule runs every minute to query an external API then update your database, you don't want 20 servers doing this at once.
+
+Luckily, by default a single server can only run a schedule at any one time. This is handled by utilising Redis lock keys. Once a schedule is picked up by a server, it is locked on Redis and cannot be run again until it is unlocked (which is performed automatically).
+
+There might be however use cases where running a scheduled task across all servers is required. If this is required, simply set the `multi` option to `true` on the schedule object.
