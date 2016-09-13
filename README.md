@@ -7,4 +7,61 @@
 
 ## RediBox Schedule
 
-Just a quick scheduler PoC - deffo not using in production 🙄
+Allows functions to run at set times, taking into consideration multi-server environments for hassle free scheduling.
+
+### Installation
+
+First ensure you have [RediBox](https://github.com/redibox/core) install.
+
+Install Memset via npm: 
+
+`npm install redibox-hook-schedule --save`
+
+### Usage
+
+#### Configure schedules
+
+Within your `redibox` config, we'll setup a new `schedule` object containing a `schedules` array. Each set item consists of a `runs` function, `data` and an `interval`.
+
+- **runs**: A function or string (which returns a function).
+- **data**: A Primitive value or Object/Array.
+- **interval**: A string of the interval time, compatible with (Later)(https://bunkat.github.io/later/parsers.html#text).
+
+```
+{
+  schedule: {
+    schedules: [
+      runs: function(scheule) {
+        // Do something every 5 minutes
+        console.log('The value of foo is: ' + scheule.data.foo);
+      },
+      data: {
+        foo: 'bar',
+      },
+      interval: 'every 5 minutes',
+    ],
+  },
+}
+```
+
+#### Accessing schedule data
+
+If passing in a function directly (like above), the schedule is bound to the `runs` function as the first argument, where the data can be access via `schedule.data`.
+
+If the value of `runs` is a globally accessible function, the schdule is bound to the function directly (as `this`). For example:
+
+```
+...
+runs: 'global.someDirectory.someFile',
+data: {
+  foo: 'bar',
+},
+...
+```
+
+```
+// global.someDirectory.someFile
+export default function() {
+ console.log('The value of foo is: ' + this.data.foo);
+}
+```
