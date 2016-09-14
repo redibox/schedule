@@ -59,3 +59,7 @@ Typically a large application will deploy many servers running the same code bas
 Luckily, by default only a single server can only run a schedule at any one time. This is handled by utilising Redis locks. Once a schedule is picked up by a server, it is locked on Redis and cannot be run again until it is unlocked (which is performed automatically).
 
 There might be however use cases where running a scheduled task across all servers is required. In this case, simply set the `multi` option to `true` on the schedule object.
+
+### License
+
+MIT
