@@ -48,6 +48,10 @@ Within your `redibox` config, we'll setup a new `schedule` object containing a `
 
 If passing in a function directly (like above), the schedule is available to the `runs` function as the first argument, where the data can be accessed via `schedule.data`.
 
+#### Schedule Timing
+
+Under the hood, the schedule uses [Later](https://www.npmjs.com/package/later). If a schedule is set to run `every 1 minute`, it will run on the minute, every minute. This ensures uniform schedules across multiple environments. It **does not** run 1 minute after the server booted.
+
 ### Multi-server environments
 
 Typically a large application will deploy many servers running the same code base. As expected the schedule will run on each individual server. If you have 20 servers deployed, and a schedule runs every minute to query an external API then update your database, you don't want 20 servers doing this at once.
