@@ -25,9 +25,18 @@ Install Schedule via npm:
 
 Within your `redibox` config, we'll setup a new `schedule` object containing a `schedules` array. Each array item consists of a `runs` function, `data` and an `interval`.
 
-- **runs**: A function or string (a globally available function as a dot notated string i.e. some.fooBar function which would resolve to global.some.fooBar automatically).
-- **data**: Any data to use when calling this schedule.
-- **interval**: A string of the interval time, compatible with [Later.js](https://bunkat.github.io/later/parsers.html#text).
+- **runs** [Function/String]
+A function or string (a globally available function as a dot notated string i.e. some.fooBar function which would resolve to global.some.fooBar automatically).
+
+- **data** [Array/Object/Primitive]
+Any data to pass along to each schedule function.
+
+- **interval** [String]
+A string of the interval time, compatible with [Later.js](https://bunkat.github.io/later/parsers.html#text).
+
+- **multi** [Boolean]
+  - default: `false`
+If `true`, the schedule will run on every server. If `false` it'll be locked to a single server only.
 
 ```
 {
