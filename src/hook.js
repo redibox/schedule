@@ -19,6 +19,9 @@ export default class Scheduler extends BaseHook {
     for (let i = 0, len = this.options.schedules.length; i < len; i++) {
       const schedule = this.options.schedules[i];
       this.options.laterSchedules[i] = later.parse.text(schedule.interval);
+      if (this.options.laterSchedules[i].error !== -1) {
+        return Promise.reject(`Schedule "${schedule.interval}" is invalid (error code ${this.options.laterSchedules[i].error}). See Later.js docs for valid formats: https://bunkat.github.io/later/parsers.html#text`);
+      }
       this.options.laterTimers[i] = later.setInterval(
         this.scheduleWrapper.bind(this, i),
         this.options.laterSchedules[i]
