@@ -9,6 +9,8 @@
 
 Allows functions to run at set times, taking into consideration multi-server environments for hassle free scheduling.
 
+Works well with [Jobs](https://github.com/redibox/job).
+
 ### Installation
 
 First ensure you have [RediBox](https://github.com/redibox/core) installed.
@@ -25,7 +27,7 @@ Within your `redibox` config, we'll setup a new `schedule` object containing a `
 
 - **runs**: A function or string (a globally available function as a dot notated string i.e. some.fooBar function which would resolve to global.some.fooBar automatically).
 - **data**: Any data to use when calling this schedule.
-- **interval**: A string of the interval time, compatible with (Later.js)(https://bunkat.github.io/later/parsers.html#text).
+- **interval**: A string of the interval time, compatible with [Later.js](https://bunkat.github.io/later/parsers.html#text).
 
 ```
 {
