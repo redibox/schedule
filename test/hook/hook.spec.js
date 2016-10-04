@@ -1,7 +1,7 @@
-/* eslint no-underscore-dangle: 0 */
-import { assert } from 'chai';
-import RediBox from 'redibox';
-import Hook from './../../src/hook';
+const { assert } = require('chai');
+const RediBox = require('redibox').default;
+
+const Hook = require('./../../src/hook');
 
 describe('core', () => {
   it('Should extend redibox hook class and provide an emitter', (done) => {

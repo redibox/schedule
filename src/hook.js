@@ -1,54 +1,227 @@
-import later from 'later';
-import defaults from './defaults';
-import { BaseHook, deepGet, getTimeStamp, isFunction } from 'redibox';
+const Promise = require('bluebird');
+const { BaseHook, deepGet, getTimeStamp, isFunction, sha1sum, tryJSONStringify, tryJSONParse } = require('redibox');
 
-export default class Scheduler extends BaseHook {
+const scripts = require('./scripts');
+const defaults = require('./defaults');
+const { parseScheduleTimes, microTime } = require('./utils');
+
+class Scheduler extends BaseHook {
   constructor() {
     super('schedule');
+
+    this.lastTick = null;
+    this.lastTickTimeTaken = null;
+    this.state = 'stopped';
+    this.processTimer = null;
   }
 
+  /**
+   * ----------------
+   *   HOOK METHODS
+   * ----------------
+   */
   /**
    *
    * @returns {Promise.<T>}
    */
   initialize() {
-    if (!this.options.schedules || !this.options.schedules.length) {
-      return Promise.resolve();
-    }
-
-    for (let i = 0, len = this.options.schedules.length; i < len; i++) {
-      const schedule = this.options.schedules[i];
-      this.options.laterSchedules[i] = later.parse.text(schedule.interval);
-      if (this.options.laterSchedules[i].error !== -1) {
-        return Promise.reject(`Schedule "${schedule.interval}" is invalid (error code ${this.options.laterSchedules[i].error}). See Later.js docs for valid formats: https://bunkat.github.io/later/parsers.html#text`);
+    this._beginWorking();
+    if (this.options.schedules && this.options.schedules.length) {
+      const promises = [];
+      for (let i = 0, len = this.options.schedules.length; i < len; i++) {
+        promises.push(this.createOrUpdate(this.options.schedules[i], true));
       }
-      this.options.laterTimers[i] = later.setInterval(
-        this.scheduleWrapper.bind(this, i),
-        this.options.laterSchedules[i]
-      );
+
+      return Promise.all(promises);
     }
 
     return Promise.resolve();
   }
 
+  // noinspection JSUnusedGlobalSymbols,JSMethodCanBeStatic
+  /**
+   * Default config for scheduler
+   * @returns {{someDefaultThing: string}}
+   */
+  defaults() {
+    return defaults;
+  }
+
+  /**
+   * Return schedule scripts for bootstrapping
+   * @returns {{processUpcoming, removeSchedule, addSchedule, updateSchedule}}
+   */
+  scripts() {
+    return scripts;
+  }
+
+  /**
+   * -------------
+   *  PUBLIC API
+   * -------------
+   */
+
+  start() {
+    // todo pubsub to other workers so that they start also
+    this._beginWorking();
+  }
+
+  stop() {
+    // todo pubsub to other workers so that they stop also
+    this._stopWorking();
+  }
+
+  findOne(name) {
+    return this.client.hget(
+      this._toKey('schedules'),
+      name
+    ).then(result => {
+      if (!result) return null;
+      return tryJSONParse(result);
+    });
+  }
+
+  find() {
+    return this.client.hgetall(
+      this._toKey('schedules')
+    );
+  }
+
   /**
    *
-   * @param i
+   * @param schedule
+   * @param occurrence
+   * @returns {Promise.<TResult>}
    */
-  scheduleWrapper(i) {
-    const schedule = this.options.schedules[i];
+  create(schedule) {
+    this.log.verbose(`create schedule '${schedule.name}'`);
+    return this.client.hset(
+      this._toKey('schedules'),
+      schedule.name,
+      tryJSONStringify(schedule)
+    ).then(() => {
+      if (!schedule.enabled || !schedule.occurrence.next) return schedule;
+      return this.client.zadd(
+        this._toKey('waiting'),
+        schedule.occurrence.next,
+        `${schedule.name}|||${schedule.versionHash}`
+      );
+    });
+  }
 
-    // 'multi' or 'noLock' skips 'single instance only' run checks across servers
-    // useful for jobs you want to run on every server not just once per cluster per X time
-    if (schedule.multi || schedule.noLock) return this.execSchedule(schedule);
+  /**
+   *
+   * @param name
+   * @returns {*}
+   */
+  destroy(name) {
+    this.log.verbose(`create schedule '${name}'`);
+    return this.client.hdet(
+      this._toKey('schedules'),
+      name
+    );
+  }
 
-    return this // very crude lock - TODO redlock this
-      .client
-      .set(this.core.toKey(`schedules:${i}`), i, 'NX', 'EX', this.options.minInterval)
-      .then(res => {
-        if (!res) return Promise.resolve();
-        return this.execSchedule(schedule);
-      });
+  update(schedule, existing, occurrence) {
+    this.log.verbose(`update schedule '${schedule.name}'`);
+  }
+
+  /**
+   *
+   * @param schedule
+   * @returns {Error}
+   */
+  validate(schedule) {
+    if (!schedule.name) return new Error('Missing schedule name.');
+    if (!schedule.runs) return new Error('Missing schedule \'runs\' property.');
+    if (!schedule.interval) return new Error('Missing schedule \'interval\' property.');
+    return parseScheduleTimes(schedule);
+  }
+
+  /**
+   * Create or update a schedule
+   * @param schedule
+   * @param createOnly
+   * @returns {*}
+   */
+  createOrUpdate(schedule, createOnly) {
+    this.log.verbose(`createOrUpdate schedule '${schedule.name}'`);
+    const validation = this.validate(schedule);
+    if (validation instanceof Error) return Promise.reject(validation);
+    if (!Object.hasOwnProperty.call(schedule, 'enabled')) schedule.enabled = true;
+    schedule.versionHash = this._createOccurrenceHash(schedule);
+    schedule.occurrence = validation;
+    schedule.timesRan = 0;
+    schedule.lastRan = 0;
+    return this.findOne(schedule.name).then(existing => {
+      if (!existing) return this.create(schedule);
+      if (createOnly) return Promise.resolve();
+      this.log.debug('Found existing schedule', existing);
+      return this.update(schedule, existing, validation);
+    });
+  }
+
+  /**
+   * -------------
+   *   INTERNALS
+   * -------------
+   */
+
+  /**
+   * Create a sha1sum hash of the interval name and starts / ends properties.
+   * We use this to validate changes on schedule intervals - so old intervals are skipped.
+   * @param schedule
+   * @private
+   */
+  _createOccurrenceHash(schedule) {
+    return sha1sum('' + schedule.name + schedule.interval + schedule.starts + schedule.ends);
+  }
+
+  _beginWorking() {
+    if (this.options.enabled && !this.processTimer) {
+      this.log.verbose('Begin Working');
+      this.processTimer = setTimeout(this._doWork.bind(this), this.options.processInterval);
+      this.state = 'active';
+    }
+  }
+
+  _stopWorking() {
+    clearTimeout(this.processTimer);
+    this.state = 'stopped';
+    this.lastTick = null;
+  }
+
+  /**
+   *
+   * @returns {boolean}
+   * @private
+   */
+  _doWork() {
+    if (this.state === 'stopped') return false;
+    this.lastTick = microTime();
+    return this.client.processupcoming(
+      this._toKey('waiting'),
+      this._toKey('queued'),
+      this._toKey('active'),
+      this._toKey('schedules'),
+      this._toKey('lock'),
+      Date.now(),
+      this.options.processIntervalLock,
+      this.core.id, // use the the worker id as the lock hash
+      this.options.processInterval,
+      (error, result) => {
+        if (error) {
+          this.log.error(error);
+        }
+        if (typeof result === 'string') {
+          this.log.debug(`Work script ran but was already locked by worker '${result}'.`);
+        } else {
+          this.lastTickTimeTaken = (microTime() - this.lastTick).toFixed(2);
+          this.log.debug(`Work script ran and moved ${result} occurrences in ${this.lastTickTimeTaken}ms.`);
+        }
+        this.processTimer = setTimeout(this._doWork.bind(this), this.options.processInterval);
+      }
+    );
   }
 
   /**
@@ -56,7 +229,7 @@ export default class Scheduler extends BaseHook {
    * @param schedule
    * @returns {Promise}
    */
-  execSchedule(schedule) {
+  _execSchedule(schedule) {
     if (!schedule.runs) throw new Error(`Schedule is missing a runs parameter - ${JSON.stringify(schedule)}`);
     const runner = typeof schedule.runs === 'string' ? deepGet(global, schedule.runs) : schedule.runs;
 
@@ -80,7 +253,7 @@ export default class Scheduler extends BaseHook {
    *
    * @param schedule
    */
-  successLogger(schedule) {
+  _successLogger(schedule) {
     this.log.info(`${getTimeStamp()}: Schedule for '${schedule.runs}' ${schedule.data ? JSON.stringify(schedule.data) : ''} has completed successfully.`);
   }
 
@@ -89,18 +262,33 @@ export default class Scheduler extends BaseHook {
    * @param schedule
    * @param error
    */
-  errorLogger(schedule, error) {
+  _errorLogger(schedule, error) {
     this.log.error(`${getTimeStamp()}: Schedule for '${schedule.runs}' ${schedule.data ? JSON.stringify(schedule.data) : ''} has failed to complete.`);
     this.log.error(error);
   }
 
   // noinspection JSUnusedGlobalSymbols,JSMethodCanBeStatic
   /**
-   * Default config for scheduler
-   * @returns {{someDefaultThing: string}}
+   * For now just returns a sha1sum of the schedule name
+   * @param schedule
+   * @returns {*}
    */
-  defaults() {
-    return defaults;
+  _scheduleHash(schedule) {
+    return sha1sum(schedule.name);
   }
 
+
+  /**
+   *
+   * @param str
+   * @returns {string}
+   */
+  _toKey(str) {
+    if (this.core.cluster.isCluster()) {
+      return `{${this.name}}:${str}`;
+    }
+    return `${this.name}:${str}`;
+  }
 }
+
+module.exports = Scheduler;

@@ -1,10 +1,12 @@
 /*
  Default Configuration
  */
-export default {
-  minInterval: 10,
+module.exports = {
+  processInterval: 1000,
+  processIntervalLock: 5000,
   schedules: [],
-  laterSchedules: [],
-  laterTimers: [],
+  events: {
+    multi: 'exec:multi',
+  },
 };
 

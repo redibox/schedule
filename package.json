@@ -2,7 +2,7 @@
   "name": "redibox-hook-schedule",
   "description": "Advanced redibox powered scheduling",
   "version": "1.1.0",
-  "main": "lib/index.js",
+  "main": "src/index.js",
   "author": "Mike Diarmid",
   "repository": {
     "github": "https://github.com/redibox/schedule"
@@ -36,27 +36,12 @@
     "ioredis"
   ],
   "scripts": {
-    "build": "babel src --out-dir lib",
-    "build-watch": "babel src --watch --out-dir lib",
-    "example": "cd example && ./../node_modules/.bin/babel-node app.js",
     "coveralls": "cat ./coverage/lcov.info | coveralls",
     "prepublish": "npm run lint && npm run build",
     "lint": "./node_modules/.bin/eslint ./src",
-    "test": "./node_modules/.bin/babel-node -- ./node_modules/istanbul/lib/cli.js cover --report lcov _mocha "
+    "test": "node -- ./node_modules/istanbul/lib/cli.js cover --report lcov _mocha "
   },
   "devDependencies": {
-    "babel-cli": "^6.8.0",
-    "babel-eslint": "^6.0.4",
-    "babel-istanbul": "^0.8.0",
-    "babel-plugin-add-module-exports": "^0.1.2",
-    "babel-plugin-transform-class-properties": "^6.8.0",
-    "babel-preset-es2015": "^6.6.0",
-    "babel-preset-es2015-node-auto": "0.0.4",
-    "babel-preset-es2015-node4": "^2.1.0",
-    "babel-preset-es2015-node5": "^1.2.0",
-    "babel-preset-es2015-node6": "^0.1.3",
-    "babel-preset-stage-0": "^6.5.0",
-    "benchmark": "^2.1.0",
     "chai": "^3.5.0",
     "coveralls": "^2.11.9",
     "eslint": "^2.9.0",
@@ -72,6 +57,7 @@
   },
   "dependencies": {
     "bluebird": "^3.4.6",
+    "chrono-node": "^1.2.4",
     "later": "^1.2.0"
   }
 }

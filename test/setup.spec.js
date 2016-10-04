@@ -1,6 +1,6 @@
 global.HOOK_NAME = 'schedule';
-import Redibox from 'redibox';
-import UserHook from './../src/hook';
+const Redibox = require('redibox').default;
+const UserHook = require('./../src/hook');
 
 global.some = {
   coolFunction(data) {
