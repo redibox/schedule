@@ -40,7 +40,8 @@ function microTime() {
  * @returns {number}
  */
 function dateToUnixTimestamp(date) {
-  return Math.ceil(date.getTime() / 1000);
+  const _date = date || new Date();
+  return Math.ceil(_date.getTime() / 1000);
 }
 
 /**
@@ -133,10 +134,10 @@ function parseScheduleTimes(scheduleOptions) {
 
     return {
       once: true,
-      ends: timeStampMS,
-      starts: timeStampMS,
+      ends: interval,
+      starts: interval,
       intervalInput: interval,
-      next: timeStampMS,
+      next: interval,
       endHuman: dateFromUnixTimestamp(interval).toISOString(),
       startHuman: dateFromUnixTimestamp(interval).toISOString(),
       nextHuman: dateFromUnixTimestamp(interval).toISOString(),
@@ -150,12 +151,12 @@ function parseScheduleTimes(scheduleOptions) {
 
   return {
     laterSchedule: schedule,
-    ends: _end || 9999999999999,
+    ends: _end || 999999999999,
     endInput: scheduleOptions.ends || false,
     starts: _start,
     startInput: scheduleOptions.starts || false,
     intervalInput: interval,
-    next: next.getTime(),
+    next: dateToUnixTimestamp(next),
     endHuman: _end ? dateFromUnixTimestamp(_end).toISOString() : 'No End Date',
     startHuman: dateFromUnixTimestamp(_start).toISOString(),
     nextHuman: next.toISOString(),

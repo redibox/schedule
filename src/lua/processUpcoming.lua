@@ -21,7 +21,7 @@ local time = tonumber(ARGV[1])
 -- get occurrences that a ready to run based on timestamp
 -- we slightly creep ahead a couple ms to ensure jubs are picked up on the dot
 -- or as close to it as possible
-local occurrences = redis.call('zrangebyscore', KEYS[1], 0, time + 250)
+local occurrences = redis.call('zrangebyscore', KEYS[1], 0, time)
 
 -- remove processed occurrences from sorted set
 if occurrences then
@@ -41,6 +41,7 @@ if occurrences then
       local scheduleVersionHash = scheduleParsed.versionHash
       local nextTimestamp = tonumber(scheduleParsed.occurrence.next)
       local endTimestamp = tonumber(scheduleParsed.occurrence.ends)
+      local startsTimestamp = tonumber(scheduleParsed.occurrence.starts)
 
       -- only valid if schedule is enabled still
       if enabled and versionHash == scheduleVersionHash then
@@ -60,9 +61,6 @@ if occurrences then
 
           -- push to work queue
           redis.call('RPUSH', KEYS[2], updatedSchedule)
-        elseif endTimestamp == -1 then
-          -- no end date
-          redis.call('RPUSH', KEYS[2], schedule)
         else
           -- do nothing - it's past the end date
           -- just disable the schedule and update it
@@ -75,7 +73,7 @@ if occurrences then
   end
 
   -- all done, now remove those occurences
-  redis.call('zremrangebyscore', KEYS[1], 0, time + 250)
+  redis.call('zremrangebyscore', KEYS[1], 0, time)
 end
 
 -- set lock to expire after half the interval time

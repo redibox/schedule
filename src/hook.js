@@ -1,14 +1,14 @@
+const later = require('later');
 const Promise = require('bluebird');
 const { BaseHook, deepGet, getTimeStamp, isFunction, sha1sum, tryJSONStringify, tryJSONParse } = require('redibox');
 
 const scripts = require('./scripts');
 const defaults = require('./defaults');
-const { parseScheduleTimes, microTime } = require('./utils');
+const { parseScheduleTimes, microTime, dateToUnixTimestamp } = require('./utils');
 
 class Scheduler extends BaseHook {
   constructor() {
     super('schedule');
-
     this.lastTick = null;
     this.lastTickTimeTaken = null;
     this.state = 'stopped';
@@ -25,17 +25,16 @@ class Scheduler extends BaseHook {
    * @returns {Promise.<T>}
    */
   initialize() {
-    this._beginWorking();
+    const promises = [];
     if (this.options.schedules && this.options.schedules.length) {
-      const promises = [];
       for (let i = 0, len = this.options.schedules.length; i < len; i++) {
         promises.push(this.createOrUpdate(this.options.schedules[i], true));
       }
-
-      return Promise.all(promises);
     }
 
-    return Promise.resolve();
+    this.createClient('block');
+    this.on(this.toEventName('client:block:ready'), this._beginWorking.bind(this));
+    return promises.length ? Promise.all(promises) : Promise.resolve();
   }
 
   // noinspection JSUnusedGlobalSymbols,JSMethodCanBeStatic
@@ -174,14 +173,78 @@ class Scheduler extends BaseHook {
    * @private
    */
   _createOccurrenceHash(schedule) {
-    return sha1sum('' + schedule.name + schedule.interval + schedule.starts + schedule.ends);
+    return sha1sum(`${schedule.name}${schedule.interval}${schedule.starts}${schedule.ends}`);
+  }
+
+  _createNextOccurrence(schedule) {
+    if (schedule.enabled && (!schedule.occurrence.endInput || schedule.lastRan <= schedule.occurrence.ends) && schedule.occurrence.laterSchedule) {
+      const next = later.schedule(schedule.occurrence.laterSchedule).next(1, new Date(schedule.lastRan * 1000), schedule.occurrence.endInput ? new Date(schedule.occurrence.ends) : null);
+      if (!next) return;
+      this.client.zadd(
+        this._toKey('waiting'),
+        dateToUnixTimestamp(next) + 1,
+        `${schedule.name}|||${schedule.versionHash}`
+      );
+    }
+  }
+
+  _runSchedule(schedule) {
+    console.log(`'${schedule.name}' schedule run: ${new Date().toISOString()} - last ran at '${schedule.lastRan}'`);
+    this._createNextOccurrence(schedule);
+  }
+
+  _restartProcessing() {
+    this.clients.block.once('ready', this._scheduleQueueTick.bind(this));
+  }
+
+  _onLocalTickComplete() {
+    setImmediate(this._scheduleQueueTick.bind(this));
+  }
+
+  _onLocalTickError(error) {
+    this.log.error(error);
+    setImmediate(this._scheduleQueueTick.bind(this));
+  }
+
+  _getNextScheduleJob(cb) {
+    this.log.debug('Getting next schedule from work queue.');
+    this.clients.block.brpoplpush(
+      this._toKey('queued'),
+      this._toKey('active'),
+      0, (pushError, schedule) => {
+        if (pushError) {
+          cb(pushError);
+        } else {
+          cb(null, tryJSONParse(schedule));
+        }
+      });
+  }
+
+  _scheduleQueueTick() {
+    if (this.options.enabled) {
+      this.log.debug('Schedule queue tick');
+      this._getNextScheduleJob((err, schedule) => {
+        if (err) {
+          this._onLocalTickError.bind(this)(err);
+        } else {
+          this._onLocalTickComplete.bind(this)();
+          this._runSchedule.bind(this)(schedule);
+        }
+      });
+    }
   }
 
   _beginWorking() {
     if (this.options.enabled && !this.processTimer) {
-      this.log.verbose('Begin Working');
+      this.log.debug('Begin Working');
       this.processTimer = setTimeout(this._doWork.bind(this), this.options.processInterval);
       this.state = 'active';
+      this.clients.block.once('error', this._restartProcessing.bind(this));
+      this.clients.block.once('close', this._restartProcessing.bind(this));
+
+      // TODO
+      // this.checkStalledSchedules.bind(this)();
+      this._scheduleQueueTick.bind(this)();
     }
   }
 
@@ -205,7 +268,7 @@ class Scheduler extends BaseHook {
       this._toKey('active'),
       this._toKey('schedules'),
       this._toKey('lock'),
-      Date.now(),
+      dateToUnixTimestamp(),
       this.options.processIntervalLock,
       this.core.id, // use the the worker id as the lock hash
       this.options.processInterval,

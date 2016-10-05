@@ -14,23 +14,31 @@ global.some = {
 };
 
 const config = {
-  hooks: {}, schedule: {
+  hooks: {},
+  schedule: {
     enabled: true,
     schedules: [
       {
-        name: 'cool function schedule',
+        name: 'every5secs',
         runs: 'some.coolFunction',
         data: { live: true },
         interval: 'every 5 seconds',
       },
       {
-        name: 'uncool function schedule',
+        name: 'every1sec',
+        runs: 'some.coolFunction',
+        data: { live: true },
+        interval: 'every 1 seconds',
+      },
+      {
+        name: 'every15secs',
         runs: 'some.unCoolFunc',
         data: { live: true },
         interval: 'every 15 seconds',
       },
     ],
-  }, log: { level: 'verbose' },
+  },
+  log: { level: 'verbose' },
 };
 config.hooks[global.HOOK_NAME] = UserHook;
 //

@@ -37,23 +37,24 @@
   ],
   "scripts": {
     "coveralls": "cat ./coverage/lcov.info | coveralls",
+    "debug": "devtool tests.js --no-nt --console -- --verbose",
     "prepublish": "npm run lint && npm run build",
     "lint": "./node_modules/.bin/eslint ./src",
     "test": "node -- ./node_modules/istanbul/lib/cli.js cover --report lcov _mocha "
   },
   "devDependencies": {
     "chai": "^3.5.0",
-    "coveralls": "^2.11.9",
-    "eslint": "^2.9.0",
-    "eslint-config-airbnb": "^8.0.0",
-    "eslint-plugin-import": "^1.6.1",
-    "eslint-plugin-jsx-a11y": "^1.0.4",
-    "eslint-plugin-react": "^5.0.1",
+    "coveralls": "^2.11.14",
+    "eslint": "^3.7.1",
+    "eslint-config-airbnb": "^12.0.0",
+    "eslint-plugin-import": "^2.0.0",
+    "eslint-plugin-jsx-a11y": "^2.2.2",
+    "eslint-plugin-react": "^6.3.0",
     "isparta": "^4.0.0",
-    "istanbul": "^1.0.0-alpha.2",
-    "mocha": "^2.4.5",
-    "redibox": "^2.0.1",
-    "sinon": "^1.17.4"
+    "istanbul": "^1.1.0-alpha.1",
+    "mocha": "^3.1.0",
+    "redibox": "^2.3.0",
+    "sinon": "^1.17.6"
   },
   "dependencies": {
     "bluebird": "^3.4.6",
