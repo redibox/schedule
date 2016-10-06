@@ -4,12 +4,12 @@ const UserHook = require('./src/hook');
 
 global.some = {
   coolFunction(data) {
-    console.log('COOL');
+    // console.log('COOL');
     return Promise.resolve();
   },
   unCoolFunc(data) {
-    console.log('UNCOOL');
-    return Promise.reject(new Error('Woops'));
+    // console.log('UNCOOL');
+    return Promise.resolve();
   },
 };
 
@@ -38,7 +38,7 @@ const config = {
       },
     ],
   },
-  log: { level: 'verbose' },
+  log: { level: 'info' },
 };
 config.hooks[global.HOOK_NAME] = UserHook;
 //

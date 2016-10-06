@@ -1,63 +1,40 @@
 const later = require('later');
 const Promise = require('bluebird');
-const { BaseHook, deepGet, getTimeStamp, isFunction, sha1sum, tryJSONStringify, tryJSONParse } = require('redibox');
+const {
+  deepGet,
+  sha1sum,
+  BaseHook,
+  isFunction,
+  getTimeStamp,
+  tryJSONParse,
+  tryJSONStringify,
 
+} = require('redibox');
+
+/**
+ * Internal Imports
+ */
 const scripts = require('./scripts');
 const defaults = require('./defaults');
-const { parseScheduleTimes, microTime, dateToUnixTimestamp } = require('./utils');
+const {
+  microTime,
+  parseScheduleTimes,
+  dateToUnixTimestamp,
+  ExponentialRetries,
+} = require('./utils');
 
-class ExponentialRetries {
-  constructor() {
-    this.instances = {};
-  }
-
-  create(tag, delay, max = 10, jitter) {
-    this.instances[tag] = {
-      max,
-      delay,
-      jitter: jitter ? delay * jitter : 0,
-      current: 1,
-    };
-  }
-
-  randomInt(min, max) {
-    return Math.floor(Math.random() * (max - min + 1) + min);
-  }
-
-  getDelay(tag) {
-    const instance = this.instances[tag];
-    if (!instance) return null;
-    if (instance.current < instance.max) {
-      this.instances[tag].current += 1;
-    }
-
-    const prev = instance.delay * (instance.current - 2) || 0;
-    let next = instance.delay * (instance.current - 1);
-
-    if (prev > 0 && instance.jitter > 0) {
-      next = this.randomInt(prev + instance.jitter, next + instance.jitter);
-    }
-
-    console.log(next);
-
-    return next;
-  }
-
-  reset(tag) {
-    if (this.instances[tag]) this.instances[tag].current = 1;
-  }
-}
-
-
-const ExpoRetry = new ExponentialRetries();
-
+/**
+ * RediBox Scheduler Hook
+ * Provides 1sec precision schedules in easy configurable human formats.
+ */
 class Scheduler extends BaseHook {
   constructor() {
     super('schedule');
-    this.lastTick = null;
-    this.lastTickTimeTaken = null;
     this.state = 'stopped';
+    this.lastTick = null;
     this.processTimer = null;
+    this.lastTickTimeTaken = null;
+    this.exponenRetry = new ExponentialRetries();
   }
 
   /**
@@ -77,8 +54,8 @@ class Scheduler extends BaseHook {
       }
     }
 
-    ExpoRetry.create('doWorkError', this.options.processInterval, 45, 0.5);
-    ExpoRetry.create('doWorkLock', this.options.processInterval, 15, 0.1);
+    this.exponenRetry.create('doWorkError', this.options.processInterval, 45, 0.5);
+    this.exponenRetry.create('doWorkLock', this.options.processInterval, 15, 0.1);
 
     this.createClient('block');
     this.on(this.toEventName('client:block:ready'), this._beginWorking.bind(this));
@@ -148,11 +125,7 @@ class Scheduler extends BaseHook {
       tryJSONStringify(schedule)
     ).then(() => {
       if (!schedule.enabled || !schedule.occurrence.next) return schedule;
-      return this.client.zadd(
-        this._toKey('waiting'),
-        schedule.occurrence.next,
-        `${schedule.name}|||${schedule.versionHash}`
-      );
+      return this._createNextOccurrence(schedule);
     });
   }
 
@@ -169,7 +142,7 @@ class Scheduler extends BaseHook {
     );
   }
 
-  update(schedule, existing, occurrence) {
+  update(schedule, existing) {
     this.log.verbose(`update schedule '${schedule.name}'`);
   }
 
@@ -196,10 +169,10 @@ class Scheduler extends BaseHook {
     const validation = this.validate(schedule);
     if (validation instanceof Error) return Promise.reject(validation);
     if (!Object.hasOwnProperty.call(schedule, 'enabled')) schedule.enabled = true;
-    schedule.versionHash = this._createOccurrenceHash(schedule);
-    schedule.occurrence = validation;
-    schedule.timesRan = 0;
     schedule.lastRan = 0;
+    schedule.timesRan = 0;
+    schedule.occurrence = validation;
+    schedule.versionHash = this._createOccurrenceHash(schedule);
     return this.findOne(schedule.name).then(existing => {
       if (!existing) return this.create(schedule);
       if (createOnly) return Promise.resolve();
@@ -226,19 +199,60 @@ class Scheduler extends BaseHook {
 
   _createNextOccurrence(schedule) {
     if (schedule.enabled && (!schedule.occurrence.endInput || schedule.lastRan <= schedule.occurrence.ends) && schedule.occurrence.laterSchedule) {
-      const next = later.schedule(schedule.occurrence.laterSchedule).next(1, new Date(schedule.lastRan * 1000), schedule.occurrence.endInput ? new Date(schedule.occurrence.ends) : null);
-      if (!next) return;
-      this.client.zadd(
+      let next = schedule.lastRan;
+
+      if (!next) {
+        next = schedule.occurrence.next;
+      } else {
+        next = later.schedule(schedule.occurrence.laterSchedule).next(1, new Date(schedule.now * 1000), schedule.occurrence.endInput ? new Date(schedule.occurrence.ends * 1000) : null);
+        if (!next) return;
+        next = dateToUnixTimestamp(next);
+      }
+
+      const key = `${schedule.name}|||${schedule.versionHash}`;
+
+      this.client.addoccurrence(
         this._toKey('waiting'),
-        dateToUnixTimestamp(next) + 1,
-        `${schedule.name}|||${schedule.versionHash}`
+        this._toKey(`${key}:${next}`),
+        next,
+        this.options.occurrenceLockTime,
+        `${schedule.name}|||${schedule.versionHash}`,
+        (error, result) => {
+          if (error) this.log.error(error);
+          if (typeof result === 'string') {
+            this.log.verbose(`Schedule '${key}' for occurrence timestamp '${next}' has already been created so was ignored.`);
+          } else {
+            this.log.verbose(`Schedule '${key}' for occurrence timestamp '${next}' created.`);
+          }
+        }
       );
+    } else {
+      this.log(`Schedule '${schedule.name}' has expired or is no longer enabled. { enabled: ${schedule.enabled}, ends: ${schedule.occurrence.ends} }`);
     }
   }
 
   _runSchedule(schedule) {
-    console.log(`'${schedule.name}' schedule run: ${new Date().toISOString()} - last ran at '${schedule.lastRan}'`);
+    schedule.now = dateToUnixTimestamp() + 1;
+    if (!schedule.runs) throw new Error(`Schedule is missing a runs parameter - ${JSON.stringify(schedule)}`);
+    const runner = typeof schedule.runs === 'string' ? deepGet(global, schedule.runs) : schedule.runs;
+
+    if (!isFunction(runner)) {
+      return this.log.error(`Schedule invalid, expected a function or a global string dot notated path to a function - ${JSON.stringify(schedule)}`);
+    }
+
     this._createNextOccurrence(schedule);
+
+    const possiblePromise = runner(schedule);
+
+    if (!possiblePromise.then) {
+      // stinky error check
+      if (possiblePromise && possiblePromise.stack) return this._onScheduleFailure(possiblePromise, schedule);
+      return this._onScheduleSuccess(schedule);
+    }
+
+    return possiblePromise
+      .then(this._onScheduleSuccess.bind(this, schedule), this._onScheduleFailure.bind(this, schedule))
+      .catch(this._onScheduleFailure.bind(this, schedule));
   }
 
   _restartProcessing() {
@@ -325,7 +339,7 @@ class Scheduler extends BaseHook {
           this.log.error(error);
           this.processTimer = setTimeout(
             this._doWork.bind(this),
-            ExpoRetry.getDelay('doWorkError')
+            this.exponenRetry.getDelay('doWorkError')
           );
         } else {
           if (typeof result === 'string') {
@@ -333,14 +347,14 @@ class Scheduler extends BaseHook {
           } else {
             this.lastTickTimeTaken = (microTime() - this.lastTick).toFixed(2);
             this.log.debug(`Work script ran and moved ${result} occurrences in ${this.lastTickTimeTaken}ms.`);
-            ExpoRetry.reset('doWorkLock');
+            this.exponenRetry.reset('doWorkLock');
           }
 
-          ExpoRetry.reset('doWorkError');
+          this.exponenRetry.reset('doWorkError');
 
           this.processTimer = setTimeout(
             this._doWork.bind(this),
-            ExpoRetry.getDelay('doWorkLock')
+            this.exponenRetry.getDelay('doWorkLock')
           );
         }
       }
@@ -350,34 +364,11 @@ class Scheduler extends BaseHook {
   /**
    *
    * @param schedule
-   * @returns {Promise}
    */
-  _execSchedule(schedule) {
-    if (!schedule.runs) throw new Error(`Schedule is missing a runs parameter - ${JSON.stringify(schedule)}`);
-    const runner = typeof schedule.runs === 'string' ? deepGet(global, schedule.runs) : schedule.runs;
-
-    if (!isFunction(runner)) {
-      return this.log.error(`Schedule invalid, expected a function or a global string dot notated path to a function - ${JSON.stringify(schedule)}`);
-    }
-
-    const possiblePromise = runner(schedule);
-
-    if (!possiblePromise.then) {
-      if (possiblePromise && possiblePromise.stack) return this.errorLogger(possiblePromise, schedule);
-      return this.successLogger(schedule);
-    }
-
-    return possiblePromise
-      .then(this.successLogger.bind(this, schedule))
-      .catch(this.errorLogger.bind(this, schedule));
-  }
-
-  /**
-   *
-   * @param schedule
-   */
-  _successLogger(schedule) {
-    this.log.info(`${getTimeStamp()}: Schedule for '${schedule.runs}' ${schedule.data ? JSON.stringify(schedule.data) : ''} has completed successfully.`);
+  _onScheduleSuccess(schedule) {
+    this.log.info(`${new Date(schedule.lastRan * 1000).toISOString()}: Schedule '${schedule.name}' ${schedule.data ? JSON.stringify(schedule.data) : ''} has completed successfully.`);
+    if (!schedule.enabled) return schedule;
+    return this._createNextOccurrence(schedule);
   }
 
   /**
@@ -385,9 +376,11 @@ class Scheduler extends BaseHook {
    * @param schedule
    * @param error
    */
-  _errorLogger(schedule, error) {
-    this.log.error(`${getTimeStamp()}: Schedule for '${schedule.runs}' ${schedule.data ? JSON.stringify(schedule.data) : ''} has failed to complete.`);
+  _onScheduleFailure(schedule, error) {
+    this.log.error(`${new Date().toISOString()}: Schedule '${schedule.name}' ${schedule.data ? JSON.stringify(schedule.data) : ''} has failed to complete.`);
     this.log.error(error);
+    if (!schedule.enabled) return schedule;
+    return this._createNextOccurrence(schedule);
   }
 
   // noinspection JSUnusedGlobalSymbols,JSMethodCanBeStatic

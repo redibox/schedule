@@ -32,6 +32,11 @@ module.exports = {
     lua: loadLuaScript('processUpcoming'),
   },
 
+  addOccurrence: {
+    keys: 2,
+    lua: loadLuaScript('addOccurrence'),
+  },
+
   removeSchedule: {
     keys: 4,
     lua: '',

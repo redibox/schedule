@@ -185,6 +185,73 @@ function loadLuaScript(script) {
   }
 }
 
+/**
+ *
+ * @param min
+ * @param max
+ * @returns {number}
+ */
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1) + min);
+}
+
+
+/**
+ * Class to help with exponential retry generation.
+ */
+class ExponentialRetries {
+  constructor() {
+    this.instances = {};
+  }
+
+  /**
+   * Create a tag.
+   * @param tag
+   * @param delay
+   * @param max
+   * @param jitter
+   */
+  create(tag, delay, max = 10, jitter) {
+    this.instances[tag] = {
+      max,
+      delay,
+      jitter: jitter ? delay * jitter : 0,
+      current: 1,
+    };
+  }
+
+  /**
+   * Get the next delay period for a tag.
+   * @param tag
+   * @returns {*}
+   */
+  getDelay(tag) {
+    const instance = this.instances[tag];
+    if (!instance) return null;
+    if (instance.current < instance.max) {
+      this.instances[tag].current += 1;
+    }
+
+    const prev = instance.delay * (instance.current - 2) || 0;
+    let next = instance.delay * (instance.current - 1);
+
+    // random between previous and next if a jitter % was provided.
+    if (prev > 0 && instance.jitter > 0) {
+      next = randomInt(prev + instance.jitter, next + instance.jitter);
+    }
+
+    return next;
+  }
+
+  /**
+   * Reset a tag back to its original values.
+   * @param tag
+   */
+  reset(tag) {
+    if (this.instances[tag]) this.instances[tag].current = 1;
+  }
+}
+
 module.exports.getUnixTimestamp = getUnixTimestamp;
 module.exports.microTime = microTime;
 module.exports.dateToUnixTimestamp = dateToUnixTimestamp;
@@ -192,3 +259,4 @@ module.exports.dateFromUnixTimestamp = dateFromUnixTimestamp;
 module.exports.parseScheduleTimes = parseScheduleTimes;
 module.exports.nextOccurrence = nextOccurrence;
 module.exports.loadLuaScript = loadLuaScript;
+module.exports.ExponentialRetries = ExponentialRetries;
