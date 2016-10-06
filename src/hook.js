@@ -6,6 +6,51 @@ const scripts = require('./scripts');
 const defaults = require('./defaults');
 const { parseScheduleTimes, microTime, dateToUnixTimestamp } = require('./utils');
 
+class ExponentialRetries {
+  constructor() {
+    this.instances = {};
+  }
+
+  create(tag, delay, max = 10, jitter) {
+    this.instances[tag] = {
+      max,
+      delay,
+      jitter: jitter ? delay * jitter : 0,
+      current: 1,
+    };
+  }
+
+  randomInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1) + min);
+  }
+
+  getDelay(tag) {
+    const instance = this.instances[tag];
+    if (!instance) return null;
+    if (instance.current < instance.max) {
+      this.instances[tag].current += 1;
+    }
+
+    const prev = instance.delay * (instance.current - 2) || 0;
+    let next = instance.delay * (instance.current - 1);
+
+    if (prev > 0 && instance.jitter > 0) {
+      next = this.randomInt(prev + instance.jitter, next + instance.jitter);
+    }
+
+    console.log(next);
+
+    return next;
+  }
+
+  reset(tag) {
+    if (this.instances[tag]) this.instances[tag].current = 1;
+  }
+}
+
+
+const ExpoRetry = new ExponentialRetries();
+
 class Scheduler extends BaseHook {
   constructor() {
     super('schedule');
@@ -31,6 +76,9 @@ class Scheduler extends BaseHook {
         promises.push(this.createOrUpdate(this.options.schedules[i], true));
       }
     }
+
+    ExpoRetry.create('doWorkError', this.options.processInterval, 45, 0.5);
+    ExpoRetry.create('doWorkLock', this.options.processInterval, 15, 0.1);
 
     this.createClient('block');
     this.on(this.toEventName('client:block:ready'), this._beginWorking.bind(this));
@@ -275,14 +323,26 @@ class Scheduler extends BaseHook {
       (error, result) => {
         if (error) {
           this.log.error(error);
-        }
-        if (typeof result === 'string') {
-          this.log.debug(`Work script ran but was already locked by worker '${result}'.`);
+          this.processTimer = setTimeout(
+            this._doWork.bind(this),
+            ExpoRetry.getDelay('doWorkError')
+          );
         } else {
-          this.lastTickTimeTaken = (microTime() - this.lastTick).toFixed(2);
-          this.log.debug(`Work script ran and moved ${result} occurrences in ${this.lastTickTimeTaken}ms.`);
+          if (typeof result === 'string') {
+            this.log.debug(`Work script ran but was already locked by worker '${result}'.`);
+          } else {
+            this.lastTickTimeTaken = (microTime() - this.lastTick).toFixed(2);
+            this.log.debug(`Work script ran and moved ${result} occurrences in ${this.lastTickTimeTaken}ms.`);
+            ExpoRetry.reset('doWorkLock');
+          }
+
+          ExpoRetry.reset('doWorkError');
+
+          this.processTimer = setTimeout(
+            this._doWork.bind(this),
+            ExpoRetry.getDelay('doWorkLock')
+          );
         }
-        this.processTimer = setTimeout(this._doWork.bind(this), this.options.processInterval);
       }
     );
   }

@@ -79,7 +79,7 @@ end
 -- set lock to expire after half the interval time
 if redis.call('get', KEYS[5]) == ARGV[3] then
   redis.debug('EXIRING KEY ' .. KEYS[5] .. ' with token ' .. ARGV[3])
-  redis.call('pexpire', KEYS[5], tonumber(ARGV[4] / 2))
+  redis.call('pexpire', KEYS[5], tonumber(ARGV[4]))
 end
 
 -- return a count of schedules pushed to ready

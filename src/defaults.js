@@ -2,7 +2,7 @@
  Default Configuration
  */
 module.exports = {
-  processInterval: 400,
+  processInterval: 300,
   processIntervalLock: 5000,
   schedules: [],
   events: {
