@@ -6,7 +6,7 @@ module.exports = {
   processInterval: 500,
   processIntervalLock: 5000,
   // seconds
-  occurrenceLockTime: 360,
+  occurrenceLockTime: 1800,
   schedules: [],
   events: {
     multi: 'exec:multi',

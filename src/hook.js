@@ -197,6 +197,11 @@ class Scheduler extends BaseHook {
     return sha1sum(`${schedule.name}${schedule.interval}${schedule.starts}${schedule.ends}`);
   }
 
+  /**
+   *
+   * @param schedule
+   * @private
+   */
   _createNextOccurrence(schedule) {
     if (schedule.enabled && (!schedule.occurrence.endInput || schedule.lastRan <= schedule.occurrence.ends) && schedule.occurrence.laterSchedule) {
       let next = schedule.lastRan;
@@ -204,25 +209,27 @@ class Scheduler extends BaseHook {
       if (!next) {
         next = schedule.occurrence.next;
       } else {
+        if (!schedule.now) schedule.now = dateToUnixTimestamp();
         next = later.schedule(schedule.occurrence.laterSchedule).next(1, new Date(schedule.now * 1000), schedule.occurrence.endInput ? new Date(schedule.occurrence.ends * 1000) : null);
         if (!next) return;
         next = dateToUnixTimestamp(next);
       }
 
-      const key = `${schedule.name}|||${schedule.versionHash}`;
+      schedule.key = `${schedule.name}|||${schedule.versionHash}`;
+      schedule.occurrenceKey = this._toKey(`${schedule.key}:${next}`);
 
       this.client.addoccurrence(
         this._toKey('waiting'),
-        this._toKey(`${key}:${next}`),
+        schedule.occurrenceKey,
         next,
         this.options.occurrenceLockTime,
-        `${schedule.name}|||${schedule.versionHash}`,
+        schedule.key,
         (error, result) => {
           if (error) this.log.error(error);
           if (typeof result === 'string') {
-            this.log.verbose(`Schedule '${key}' for occurrence timestamp '${next}' has already been created so was ignored.`);
+            this.log.verbose(`Schedule '${schedule.key}' for occurrence timestamp '${next}' has already been created so was ignored.`);
           } else {
-            this.log.verbose(`Schedule '${key}' for occurrence timestamp '${next}' created.`);
+            this.log.verbose(`Schedule '${schedule.key}' for occurrence timestamp '${next}' created.`);
           }
         }
       );
@@ -231,16 +238,21 @@ class Scheduler extends BaseHook {
     }
   }
 
+  /**
+   *
+   * @param schedule
+   * @returns {*}
+   * @private
+   */
   _runSchedule(schedule) {
     schedule.now = dateToUnixTimestamp() + 1;
+    this._createNextOccurrence(schedule);
     if (!schedule.runs) throw new Error(`Schedule is missing a runs parameter - ${JSON.stringify(schedule)}`);
     const runner = typeof schedule.runs === 'string' ? deepGet(global, schedule.runs) : schedule.runs;
 
     if (!isFunction(runner)) {
       return this.log.error(`Schedule invalid, expected a function or a global string dot notated path to a function - ${JSON.stringify(schedule)}`);
     }
-
-    this._createNextOccurrence(schedule);
 
     const possiblePromise = runner(schedule);
 
@@ -255,19 +267,37 @@ class Scheduler extends BaseHook {
       .catch(this._onScheduleFailure.bind(this, schedule));
   }
 
+  /**
+   *
+   * @private
+   */
   _restartProcessing() {
     this.clients.block.once('ready', this._scheduleQueueTick.bind(this));
   }
 
+  /**
+   *
+   * @private
+   */
   _onLocalTickComplete() {
     setImmediate(this._scheduleQueueTick.bind(this));
   }
 
+  /**
+   *
+   * @param error
+   * @private
+   */
   _onLocalTickError(error) {
     this.log.error(error);
     setImmediate(this._scheduleQueueTick.bind(this));
   }
 
+  /**
+   *
+   * @param cb
+   * @private
+   */
   _getNextScheduleJob(cb) {
     this.log.debug('Getting next schedule from work queue.');
     this.clients.block.brpoplpush(
@@ -277,11 +307,17 @@ class Scheduler extends BaseHook {
         if (pushError) {
           cb(pushError);
         } else {
-          cb(null, tryJSONParse(schedule));
+          const _schedule = tryJSONParse(schedule);
+          _schedule.raw = schedule;
+          cb(null, _schedule);
         }
       });
   }
 
+  /**
+   *
+   * @private
+   */
   _scheduleQueueTick() {
     if (this.options.enabled) {
       this.log.debug('Schedule queue tick');
@@ -296,6 +332,10 @@ class Scheduler extends BaseHook {
     }
   }
 
+  /**
+   *
+   * @private
+   */
   _beginWorking() {
     if (this.options.enabled && !this.processTimer) {
       this.log.debug('Begin Working');
@@ -310,6 +350,10 @@ class Scheduler extends BaseHook {
     }
   }
 
+  /**
+   *
+   * @private
+   */
   _stopWorking() {
     clearTimeout(this.processTimer);
     this.state = 'stopped';
@@ -364,9 +408,32 @@ class Scheduler extends BaseHook {
   /**
    *
    * @param schedule
+   * @private
+   */
+  _completeOccurrence(schedule) {
+    if (schedule.occurrenceKey) {
+      this.client.completeoccurrence(
+        schedule.occurrenceKey,
+        this._toKey('active'),
+        this._toKey('stalling'),
+        Math.ceil(this.options.occurrenceLockTime / 6),
+        schedule.raw,
+        schedule.key,
+        (error) => {
+          if (error) this.log.error(error);
+          this.log.debug(`Completed occurrence '${schedule.occurrenceKey}'.`);
+        }
+      );
+    }
+  }
+
+  /**
+   *
+   * @param schedule
    */
   _onScheduleSuccess(schedule) {
-    this.log.info(`${new Date(schedule.lastRan * 1000).toISOString()}: Schedule '${schedule.name}' ${schedule.data ? JSON.stringify(schedule.data) : ''} has completed successfully.`);
+    this.log.verbose(`${new Date(schedule.lastRan * 1000).toISOString()}: Schedule '${schedule.name}' ${schedule.data ? JSON.stringify(schedule.data) : ''} has completed successfully.`);
+    this._completeOccurrence(schedule);
     if (!schedule.enabled) return schedule;
     return this._createNextOccurrence(schedule);
   }
@@ -379,20 +446,10 @@ class Scheduler extends BaseHook {
   _onScheduleFailure(schedule, error) {
     this.log.error(`${new Date().toISOString()}: Schedule '${schedule.name}' ${schedule.data ? JSON.stringify(schedule.data) : ''} has failed to complete.`);
     this.log.error(error);
+    this._completeOccurrence(schedule);
     if (!schedule.enabled) return schedule;
     return this._createNextOccurrence(schedule);
   }
-
-  // noinspection JSUnusedGlobalSymbols,JSMethodCanBeStatic
-  /**
-   * For now just returns a sha1sum of the schedule name
-   * @param schedule
-   * @returns {*}
-   */
-  _scheduleHash(schedule) {
-    return sha1sum(schedule.name);
-  }
-
 
   /**
    *

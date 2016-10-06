@@ -31,6 +31,12 @@ const config = {
         interval: 'every 1 seconds',
       },
       {
+        name: 'every3sec',
+        runs: 'some.coolFunction',
+        data: { live: true },
+        interval: 'every 3 seconds',
+      },
+      {
         name: 'every15secs',
         runs: 'some.unCoolFunc',
         data: { live: true },
@@ -38,7 +44,7 @@ const config = {
       },
     ],
   },
-  log: { level: 'info' },
+  log: { level: 'verbose' },
 };
 config.hooks[global.HOOK_NAME] = UserHook;
 //

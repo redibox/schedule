@@ -37,6 +37,11 @@ module.exports = {
     lua: loadLuaScript('addOccurrence'),
   },
 
+  completeOccurrence: {
+    keys: 3,
+    lua: loadLuaScript('completeOccurrence'),
+  },
+
   removeSchedule: {
     keys: 4,
     lua: '',

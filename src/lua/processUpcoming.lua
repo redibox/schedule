@@ -73,7 +73,7 @@ if occurrences then
   end
 
   -- all done, now remove those occurences
-  redis.call('zremrangebyscore', KEYS[1], 0, time)
+  redis.call('zrem', KEYS[1], unpack(occurrences))
 end
 
 -- set lock to expire after half the interval time
