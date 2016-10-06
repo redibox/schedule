@@ -35,6 +35,8 @@ class Scheduler extends BaseHook {
     this.processTimer = null;
     this.lastTickTimeTaken = null;
     this.exponenRetry = new ExponentialRetries();
+    this.exponenRetry.create('doWorkError', this.options.processInterval, 45, 0.5);
+    this.exponenRetry.create('doWorkLock', this.options.processInterval, 15, 0.1);
   }
 
   /**
@@ -47,18 +49,28 @@ class Scheduler extends BaseHook {
    * @returns {Promise.<T>}
    */
   initialize() {
+    if (this.options.enabled) {
+      this.createClient('block');
+      this.on(this.toEventName('client:block:ready'), this._beginWorking.bind(this));
+      return this._createDefaultSchedules();
+    }
+
+    return Promise.resolve();
+  }
+
+  /**
+   *
+   * @returns {*}
+   * @private
+   */
+  _createDefaultSchedules() {
     const promises = [];
     if (this.options.schedules && this.options.schedules.length) {
-      for (let i = 0, len = this.options.schedules.length; i < len; i++) {
+      for (let i = 0, len = this.options.schedules.length; i < len; i += 1) {
         promises.push(this.createOrUpdate(this.options.schedules[i], true));
       }
     }
 
-    this.exponenRetry.create('doWorkError', this.options.processInterval, 45, 0.5);
-    this.exponenRetry.create('doWorkLock', this.options.processInterval, 15, 0.1);
-
-    this.createClient('block');
-    this.on(this.toEventName('client:block:ready'), this._beginWorking.bind(this));
     return promises.length ? Promise.all(promises) : Promise.resolve();
   }
 
@@ -173,7 +185,7 @@ class Scheduler extends BaseHook {
     schedule.timesRan = 0;
     schedule.occurrence = validation;
     schedule.versionHash = this._createOccurrenceHash(schedule);
-    return this.findOne(schedule.name).then(existing => {
+    return this.findOne(schedule.name).then((existing) => {
       if (!existing) return this.create(schedule);
       if (createOnly) return Promise.resolve();
       this.log.debug('Found existing schedule', existing);
@@ -234,7 +246,7 @@ class Scheduler extends BaseHook {
         }
       );
     } else {
-      this.log(`Schedule '${schedule.name}' has expired or is no longer enabled. { enabled: ${schedule.enabled}, ends: ${schedule.occurrence.ends} }`);
+      this.log.verbose(`Schedule '${schedule.name}' has expired or is no longer enabled. { enabled: ${schedule.enabled}, ends: ${schedule.occurrence.ends} }`);
     }
   }
 
@@ -271,7 +283,8 @@ class Scheduler extends BaseHook {
    *
    * @private
    */
-  _restartProcessing() {
+  _restartProcessing(error) {
+    if (error) this.log.error(error);
     this.clients.block.once('ready', this._scheduleQueueTick.bind(this));
   }
 
@@ -332,6 +345,7 @@ class Scheduler extends BaseHook {
     }
   }
 
+
   /**
    *
    * @private
@@ -356,6 +370,7 @@ class Scheduler extends BaseHook {
    */
   _stopWorking() {
     clearTimeout(this.processTimer);
+    clearTimeout(this.flushDetectorTimer);
     this.state = 'stopped';
     this.lastTick = null;
   }
@@ -368,12 +383,13 @@ class Scheduler extends BaseHook {
   _doWork() {
     if (this.state === 'stopped') return false;
     this.lastTick = microTime();
-    return this.client.processupcoming(
+    return this.client.processtick(
       this._toKey('waiting'),
       this._toKey('queued'),
       this._toKey('active'),
       this._toKey('schedules'),
       this._toKey('lock'),
+      this._toKey('hello'), // used for flush detection
       dateToUnixTimestamp(),
       this.options.processIntervalLock,
       this.core.id, // use the the worker id as the lock hash
@@ -390,8 +406,14 @@ class Scheduler extends BaseHook {
             this.log.debug(`Work script ran but was already locked by worker '${result}'.`);
           } else {
             this.lastTickTimeTaken = (microTime() - this.lastTick).toFixed(2);
-            this.log.debug(`Work script ran and moved ${result} occurrences in ${this.lastTickTimeTaken}ms.`);
+            this.log.debug(`Work script ran and moved ${result[0]} occurrences in ${this.lastTickTimeTaken}ms.`);
             this.exponenRetry.reset('doWorkLock');
+
+            // flush detection
+            if (result[1] === 'OK') {
+              this.log.verbose('Uh-oh, looks like something has been flushed on redis, recreating all default schedules.');
+              this._createDefaultSchedules();
+            }
           }
 
           this.exponenRetry.reset('doWorkError');
@@ -432,7 +454,7 @@ class Scheduler extends BaseHook {
    * @param schedule
    */
   _onScheduleSuccess(schedule) {
-    this.log.verbose(`${new Date(schedule.lastRan * 1000).toISOString()}: Schedule '${schedule.name}' ${schedule.data ? JSON.stringify(schedule.data) : ''} has completed successfully.`);
+    this.log.info(`${new Date(schedule.lastRan * 1000).toISOString()}: Schedule '${schedule.name}' ${schedule.data ? JSON.stringify(schedule.data) : ''} has completed successfully.`);
     this._completeOccurrence(schedule);
     if (!schedule.enabled) return schedule;
     return this._createNextOccurrence(schedule);

@@ -27,9 +27,9 @@
 const { loadLuaScript } = require('./utils');
 
 module.exports = {
-  processUpcoming: {
-    keys: 5,
-    lua: loadLuaScript('processUpcoming'),
+  processTick: {
+    keys: 6,
+    lua: loadLuaScript('process'),
   },
 
   addOccurrence: {

@@ -4,6 +4,7 @@
    key 3 -> rdb:schedule:active
    key 4 -> rdb:schedule:schedules
    key 5 -> rdb:schedule:lock
+   key 6 -> rdb:schedule:hello
    arg 1 -> timestampMs
    arg 2 -> lockTime
    arg 3 -> lockId - this is the redibox worker id (this.core.id)
@@ -70,10 +71,9 @@ if occurrences then
         end
       end
     end
+    -- all done, now remove this occurences
+    redis.call('zrem', KEYS[1], occurrence)
   end
-
-  -- all done, now remove those occurences
-  redis.call('zrem', KEYS[1], unpack(occurrences))
 end
 
 -- set lock to expire after half the interval time
@@ -83,4 +83,5 @@ if redis.call('get', KEYS[5]) == ARGV[3] then
 end
 
 -- return a count of schedules pushed to ready
-return #occurrences
+return { #occurrences, redis.call('set', KEYS[6], time, 'NX') }
+--return #occurrences
