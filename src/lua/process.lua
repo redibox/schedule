@@ -9,7 +9,7 @@
    arg 2 -> lockTime
    arg 3 -> lockId - this is the redibox worker id (this.core.id)
    arg 4 -> lockInterval
- ]]
+]]
 local lock = redis.call('get', KEYS[5])
 
 if lock then
@@ -29,8 +29,8 @@ if occurrences then
   -- push
   for i, occurrence in ipairs(occurrences) do
     -- get the schedule json string for hash table
-    local jobName, versionHash = occurrence:match("([^,]+)|||([^,]+)")
-    local schedule = redis.call('hget', KEYS[4], jobName)
+    local name, versionHash = occurrence:match("([^,]+)|||([^,]+)")
+    local schedule = redis.call('hget', KEYS[4], name)
 
     -- continue if we found schedule
     if schedule then
@@ -58,7 +58,7 @@ if occurrences then
 
           -- re-encode json and update hash
           local updatedSchedule = cjson.encode(scheduleParsed);
-          redis.call('hset', KEYS[4], jobName, updatedSchedule)
+          redis.call('hset', KEYS[4], name, updatedSchedule)
 
           -- push to work queue
           redis.call('RPUSH', KEYS[2], updatedSchedule)
@@ -67,7 +67,7 @@ if occurrences then
           -- just disable the schedule and update it
           scheduleParsed.enabled = false
           scheduleParsed.stoppedAt = time
-          redis.call('hset', KEYS[4], jobName, cjson.encode(scheduleParsed))
+          redis.call('hset', KEYS[4], name, cjson.encode(scheduleParsed))
         end
       end
     end
