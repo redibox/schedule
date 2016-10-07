@@ -42,9 +42,25 @@ const config = {
         data: { live: true },
         interval: 'every 15 seconds',
       },
+      {
+        name: 'every30secs',
+        runs: 'some.unCoolFunc',
+        data: { live: true },
+        interval: 'every 30 seconds',
+      },
+      {
+        name: 'every1minute',
+        runs: 'some.unCoolFunc',
+        interval: 'every 1 minutes',
+      },
+      {
+        name: 'every2minute',
+        runs: 'some.unCoolFunc',
+        interval: 'every 2 minutes',
+      },
     ],
   },
-  log: { level: 'verbose' },
+  log: { level: 'info' },
 };
 config.hooks[global.HOOK_NAME] = UserHook;
 //

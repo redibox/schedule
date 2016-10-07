@@ -145,8 +145,18 @@ function parseScheduleTimes(scheduleOptions) {
   } else {
     return new Error('Invalid interval attribute provided.');
   }
+
   // get the next interval occurrence
-  const next = later.schedule(schedule).next(1, dateFromUnixTimestamp(_start), _end ? dateFromUnixTimestamp(_end) : null);
+  const startDate = dateFromUnixTimestamp(_start - 1);
+  // we need to get next 2 occurrences as later counts the current time as valid in most cases
+  let next = later.schedule(schedule).next(2, startDate, _end ? dateFromUnixTimestamp(_end) : null);
+  if (!next || !next.length) return new Error('No more occurrences possible, are the start and end strings correct?');
+  // if the first occurrence is the same as the time now then use the 2nd occurrence
+  if (next[0].getTime() === startDate.getTime()) {
+    next = next[1];
+  } else {
+    next = next[0];
+  }
   if (!next) return new Error('No more occurrences possible, are the start and end strings correct?');
 
   return {
