@@ -22,6 +22,7 @@ const config = {
         name: 'every5secs',
         runs: 'some.coolFunction',
         interval: 'every 5 seconds',
+        starts: 'in 1 minute',
         times: 3,
       },
       // {
