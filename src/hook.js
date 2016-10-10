@@ -51,6 +51,7 @@ class Scheduler extends BaseHook {
     if (this.options.enabled) {
       this.createClient('block');
       this.on(this.toEventName('client:block:ready'), this._beginWorking.bind(this));
+      this.core.pubsub.subscribe(this.toEventName('runMultiJob'), this._runMultiSchedule.bind(this));
       return this._createDefaultSchedules();
     }
 
@@ -256,30 +257,47 @@ class Scheduler extends BaseHook {
     }
   }
 
+  _runMultiSchedule(schedule) {
+    this._runSchedule(schedule, true);
+  }
+
   /**
    *
    * @param schedule
+   * @param fromMulti
    * @returns {*}
    * @private
    */
-  _runSchedule(schedule) {
+  _runSchedule(schedule, fromMulti) {
+    // ignore schedules from multi event if the event origin is the same as this instance
+    if (fromMulti && schedule.coreId === this.core.id) return null;
     schedule.now = dateToUnixTimestamp() + 1;
-    this._createNextOccurrence(schedule);
-    if (!schedule.runs) throw new Error(`Schedule is missing a runs parameter - ${JSON.stringify(schedule)}`);
-    const runner = typeof schedule.runs === 'string' ? deepGet(global, schedule.runs) : schedule.runs;
 
+    // create the next occurrence - we do this before and after a job runs just tobe sure
+    // they can't duplicate so no harm in doing this.
+    if (!fromMulti) this._createNextOccurrence(schedule);
+
+    // if we're a 'multi' instance schedule tell other workers to run the same schedule
+    if (!fromMulti && schedule.multi) {
+      this.core.pubsub.publish(this.toEventName('runMultiJob'), Object.assign({ coreId: this.core.id }, schedule));
+    }
+
+    // validate the 'runs' property and make sure it eventually leads to a function
+    if (!schedule.runs) return this.log.error(new Error(`Schedule is missing a runs parameter - ${JSON.stringify(schedule)}`));
+    const runner = typeof schedule.runs === 'string' ? deepGet(global, schedule.runs) : schedule.runs;
     if (!isFunction(runner)) {
       return this.log.error(`Schedule invalid, expected a function or a global string dot notated path to a function - ${JSON.stringify(schedule)}`);
     }
 
+    // exec schedule runner
     const possiblePromise = runner(schedule);
-
     if (!possiblePromise.then) {
       // stinky error check
       if (possiblePromise && possiblePromise.stack) return this._onScheduleFailure(possiblePromise, schedule);
       return this._onScheduleSuccess(schedule);
     }
 
+    // if a promise is detected as a return then exec it
     return possiblePromise
       .then(this._onScheduleSuccess.bind(this, schedule), this._onScheduleFailure.bind(this, schedule))
       .catch(this._onScheduleFailure.bind(this, schedule));
