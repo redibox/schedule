@@ -47,7 +47,7 @@ if occurrences then
       -- only valid if schedule is enabled still
       if enabled and versionHash == scheduleVersionHash then
         -- check this occurence is not > end timestamp
-        if scheduleParsed.occurrence.once or nextTimestamp <= endTimestamp then
+        if scheduleParsed.occurrence.once or (nextTimestamp <= endTimestamp)then
           -- update number of times ran counter
           scheduleParsed.timesRan = scheduleParsed.timesRan + 1
           scheduleParsed.lastRan = time

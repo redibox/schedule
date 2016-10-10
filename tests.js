@@ -21,46 +21,42 @@ const config = {
       {
         name: 'every5secs',
         runs: 'some.coolFunction',
-        data: { live: true },
         interval: 'every 5 seconds',
+        times: 3,
       },
-      {
-        name: 'every1sec',
-        runs: 'some.coolFunction',
-        data: { live: true },
-        interval: 'every 1 seconds',
-      },
-      {
-        name: 'every3sec',
-        runs: 'some.coolFunction',
-        data: { live: true },
-        interval: 'every 3 seconds',
-      },
-      {
-        name: 'every15secs',
-        runs: 'some.unCoolFunc',
-        data: { live: true },
-        interval: 'every 15 seconds',
-      },
-      {
-        name: 'every30secs',
-        runs: 'some.unCoolFunc',
-        data: { live: true },
-        interval: 'every 30 seconds',
-      },
-      {
-        name: 'every1minute',
-        runs: 'some.unCoolFunc',
-        interval: 'every 1 minutes',
-      },
-      {
-        name: 'every2minute',
-        runs: 'some.unCoolFunc',
-        interval: 'every 2 minutes',
-      },
+      // {
+      //   name: 'every1sec',
+      //   runs: 'some.coolFunction',
+      //   interval: 'every 1 seconds',
+      // },
+      // {
+      //   name: 'every3sec',
+      //   runs: 'some.coolFunction',
+      //   interval: 'every 3 seconds',
+      // },
+      // {
+      //   name: 'every15secs',
+      //   runs: 'some.unCoolFunc',
+      //   interval: 'every 15 seconds',
+      // },
+      // {
+      //   name: 'every30secs',
+      //   runs: 'some.unCoolFunc',
+      //   interval: 'every 30 seconds',
+      // },
+      // {
+      //   name: 'every1minute',
+      //   runs: 'some.unCoolFunc',
+      //   interval: 'every 1 minutes',
+      // },
+      // {
+      //   name: 'every2minute',
+      //   runs: 'some.unCoolFunc',
+      //   interval: 'every 2 minutes',
+      // },
     ],
   },
-  log: { level: 'info' },
+  log: { level: 'verbose' },
 };
 config.hooks[global.HOOK_NAME] = UserHook;
 //

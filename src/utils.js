@@ -59,14 +59,13 @@ function dateFromUnixTimestamp(ts) {
  * @param scheduleOptions
  */
 function parseScheduleTimes(scheduleOptions) {
-  const times = scheduleOptions.times;
+  const _times = scheduleOptions.times;
   const interval = scheduleOptions.interval;
 
   let schedule = null;
   let _start = scheduleOptions.starts;
   let _end = scheduleOptions.ends || false;
 
-  const _times = times + 1;
   const now = getUnixTimestamp();
 
   // test if the interval string is a cron string
@@ -118,10 +117,10 @@ function parseScheduleTimes(scheduleOptions) {
 
     // if no end string was specified but we have 'times' then calculate the date
     // of the last occurrence
-    if (!scheduleOptions.ends && times) {
+    if (!scheduleOptions.ends && _times) {
       const nextTimes = later.schedule(schedule).next(_times, dateFromUnixTimestamp(_start));
       if (nextTimes && nextTimes.length) {
-        _end = nextTimes[nextTimes.length - 1].getTime();
+        _end = dateToUnixTimestamp(nextTimes[nextTimes.length - 1]);
       } else {
         return new Error(
           'Error getting occurrences based on number of times, no occurrences were returned for the number of times specified with the current date criteria.'
@@ -170,6 +169,7 @@ function parseScheduleTimes(scheduleOptions) {
     endHuman: _end ? dateFromUnixTimestamp(_end).toISOString() : 'No End Date',
     startHuman: dateFromUnixTimestamp(_start).toISOString(),
     nextHuman: next.toISOString(),
+    times: _times,
   };
 }
 

@@ -33,7 +33,7 @@ module.exports = {
   },
 
   addOccurrence: {
-    keys: 2,
+    keys: 3,
     lua: loadLuaScript('addOccurrence'),
   },
 

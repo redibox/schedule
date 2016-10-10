@@ -19,6 +19,7 @@ const {
   microTime,
   parseScheduleTimes,
   dateToUnixTimestamp,
+  dateFromUnixTimestamp,
   ExponentialRetries,
 } = require('./utils');
 
@@ -240,9 +241,12 @@ class Scheduler extends BaseHook {
       this.client.addoccurrence(
         this._toKey('waiting'),
         schedule.occurrenceKey,
+        this._toKey('schedules'),
         next,
+        dateFromUnixTimestamp(next).toISOString(),
         this.options.occurrenceLockTime,
         schedule.key,
+        schedule.name,
         (error, result) => {
           if (error) this.log.error(error);
           if (typeof result === 'string') {
