@@ -76,6 +76,20 @@ describe('schedule parser', () => {
     done();
   });
 
+  it('Should default to now if no starts property provided', (done) => {
+    const now = dateToUnixTimestamp();
+    const schedule = parseScheduleTimes({ interval: 'every 1 seconds' });
+    assert.equal(schedule.next, now);
+    assert.isString(schedule.endHuman);
+    assert.isString(schedule.startHuman);
+    assert.isString(schedule.nextHuman);
+
+    // now check starts prop
+    assert.isNumber(schedule.starts, 'starts property is not a valid timestamp');
+    assert.equal(schedule.starts, now);
+    done();
+  });
+
   it('Should error if unable to parse a date from the starts string', (done) => {
     const schedule = parseScheduleTimes({ interval: 'every 5 seconds', starts: 'wehrnsfhb' });
     assert.equal(schedule instanceof Error, true);
@@ -181,6 +195,24 @@ describe('schedule parser', () => {
     // now check ends prop
     assert.isNumber(schedule.ends, 'ends property is not a valid timestamp');
     assert.equal(schedule.ends, inFive);
+    done();
+  });
+
+  /** ********
+   *  TIMES
+   ******* **/
+
+  it('Should allow specifying the number of times a job should run', (done) => {
+    const schedule = parseScheduleTimes({ interval: 'every 1 minute', times: 5 });
+    assert.isObject(schedule.laterSchedule);
+    assert.isArray(schedule.laterSchedule.schedules);
+    assert.isObject(schedule.laterSchedule.schedules[0]);
+    assert.isArray(schedule.laterSchedule.schedules[0].m);
+    assert.equal(schedule.laterSchedule.schedules[0].m.length, 60);
+
+    // now check ends prop
+    assert.isNumber(schedule.ends, 'ends property is not a valid timestamp');
+    assert.equal(schedule.ends, schedule.next + (60 * 4));
     done();
   });
 });

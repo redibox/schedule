@@ -97,7 +97,7 @@ function parseScheduleTimes(scheduleOptions) {
     // parse the start date
     if (_start && typeof _start === 'string') {
       // user provided a human date string
-      const startDate = chrono.parse(_start, null, { forwardDatesOnly: true });
+      const startDate = chrono.parse(_start, null, { forwardDatesOnly: scheduleOptions.forwardDatesOnly });
       if (startDate.length && startDate[0].start) _start = dateToUnixTimestamp(startDate[0].start.date());
       else return new Error(`Error parsing 'starting from' value of '${_start}'. Did you forget to use a keyword such as 'in'?`);
     } else if (_start && Object.prototype.toString.call(_start) === '[object Date]') {
@@ -111,7 +111,7 @@ function parseScheduleTimes(scheduleOptions) {
     // parse then end date
     if (_end && typeof _end === 'string') {
       // user provided a human date string
-      const endDate = chrono.parse(_end, null, { forwardDatesOnly: true });
+      const endDate = chrono.parse(_end, null, { forwardDatesOnly: scheduleOptions.forwardDatesOnly });
       if (endDate.length && endDate[0].start) _end = dateToUnixTimestamp(endDate[0].start.date());
       else return new Error(`Error parsing 'until' value of '${_end}'. Did you forget to use a keyword such as 'in'?`);
     } else if (_end && Object.prototype.toString.call(_end) === '[object Date]') {
@@ -119,33 +119,36 @@ function parseScheduleTimes(scheduleOptions) {
       _end = dateToUnixTimestamp(_end);
     }
 
-    // if no start then default to now
-    if (_start < now) _start = now;
+    if (!scheduleOptions.forwardDatesOnly) {
+      // if the start date is in the past then default to now
+      if (_start < now) _start = now;
+      // if the end date is in the past then default to now
+      if (_end && _end < now) _end = now;
+    }
 
-    // if the end date is in the past then default to now
-    if (_end && _end < now) _end = now;
-
-    // if no end string was specified but we have 'times' then calculate the date
+    // if no ends prop was specified but we have 'times' then calculate the date
     // of the last occurrence
     if (!scheduleOptions.ends && _times) {
-      const nextTimes = later.schedule(schedule).next(_times, dateFromUnixTimestamp(_start));
-      if (nextTimes && nextTimes.length) {
-        _end = dateToUnixTimestamp(nextTimes[nextTimes.length - 1]);
-      } else {
+      // get the next interval occurrence
+      const startDate = dateFromUnixTimestamp(_start - 1);
+      const nextTimes = later.schedule(schedule).next(_times + 1, startDate);
+      if (nextTimes && nextTimes[0].getTime() === startDate.getTime()) nextTimes.shift();
+      if (!nextTimes) {
         return new Error(
           'Error getting occurrences based on number of times, no occurrences were returned for the number of times specified with the current date criteria.'
         );
       }
+      _end = dateToUnixTimestamp(nextTimes[nextTimes.length - 1]);
     }
   } else if (typeof interval === 'number') {
     if (interval <= now) return new Error(`Unix timestamp interval provided must not be in the past - you provided an interval of '${interval}'`);
 
     return {
       once: true,
+      next: interval,
       ends: interval,
       starts: interval,
       intervalInput: interval,
-      next: interval,
       endHuman: dateFromUnixTimestamp(interval).toISOString(),
       startHuman: dateFromUnixTimestamp(interval).toISOString(),
       nextHuman: dateFromUnixTimestamp(interval).toISOString(),
