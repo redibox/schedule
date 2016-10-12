@@ -33,6 +33,17 @@ describe('schedule parser', () => {
     done();
   });
 
+  it('Should error if interval timestamp is in the past (for single run jobs)', (done) => {
+    const inFive = (dateToUnixTimestamp() - fiveMinute) - 1;
+    const schedule = parseScheduleTimes({ interval: inFive });
+    assert.equal(schedule instanceof Error, true);
+    done();
+  });
+
+  /** ********
+   *  STARTS
+   ******* **/
+
   it('Should correctly parse a human interval start string', (done) => {
     const inFive = (dateToUnixTimestamp() + fiveMinute) - 1;
     const schedule = parseScheduleTimes({ interval: 'every 1 minute', starts: 'in 5 minutes' });
@@ -62,13 +73,6 @@ describe('schedule parser', () => {
     // now check starts prop
     assert.isNumber(schedule.starts, 'starts property is not a valid timestamp');
     assert.equal(schedule.starts, inFive);
-    done();
-  });
-
-  it('Should error if interval timestamp is in the past (for single run jobs)', (done) => {
-    const inFive = (dateToUnixTimestamp() - fiveMinute) - 1;
-    const schedule = parseScheduleTimes({ interval: inFive });
-    assert.equal(schedule instanceof Error, true);
     done();
   });
 
@@ -124,10 +128,9 @@ describe('schedule parser', () => {
     done();
   });
 
-
-  // TODO end date validation
-
-
+  /** ********
+   *  ENDS
+   ******* **/
 
   it('Should error if unable to parse a date from the ends string', (done) => {
     const schedule = parseScheduleTimes({ interval: 'every 5 seconds', ends: 'wehrnsfhb' });
@@ -180,7 +183,4 @@ describe('schedule parser', () => {
     assert.equal(schedule.ends, inFive);
     done();
   });
-
-
-
 });
