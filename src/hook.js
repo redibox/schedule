@@ -112,7 +112,7 @@ class Scheduler extends BaseHook {
     return this.client.hget(
       this._toKey('schedules'),
       name
-    ).then(result => {
+    ).then((result) => {
       if (!result) return null;
       return tryJSONParse(result);
     });
@@ -127,7 +127,6 @@ class Scheduler extends BaseHook {
   /**
    *
    * @param schedule
-   * @param occurrence
    * @returns {Promise.<TResult>}
    */
   create(schedule) {
@@ -155,7 +154,7 @@ class Scheduler extends BaseHook {
     );
   }
 
-  update(schedule, existing) {
+  update(schedule) {
     this.log.verbose(`update schedule '${schedule.name}'`);
   }
 

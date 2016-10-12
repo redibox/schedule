@@ -4,8 +4,16 @@ const { getTimeStamp } = require('redibox');
 
 const { readFileSync } = require('fs');
 const { resolve } = require('path');
-
 const containsAlphaCharsRegex = /[a-z:]/i;
+
+/**
+ *
+ * @param timestamp
+ * @returns {boolean}
+ */
+function isValidTimestamp(timestamp) {
+  return (new Date(timestamp)).getTime() > 0;
+}
 
 /**
  * Returns a timestamp in seconds
@@ -13,8 +21,10 @@ const containsAlphaCharsRegex = /[a-z:]/i;
  * @returns {number}
  */
 let _timestamp;
+// eslint-disable-next-line
 var _ncalls = 0; // let compound assignment is de-opt in v8 currently.
 function getUnixTimestamp() {
+  // eslint-disable-next-line
   if (!_timestamp || ++_ncalls > 1000) {
     _timestamp = Math.ceil(getTimeStamp() / 1000);
     _ncalls = 0;
@@ -31,7 +41,7 @@ function getUnixTimestamp() {
  */
 function microTime() {
   const hrTime = process.hrtime();
-  return (hrTime[0] * 1000000 + hrTime[1] / 1000) / 1000;
+  return ((hrTime[0] * 1000000) + (hrTime[1] / 1000)) / 1000;
 }
 
 /**
@@ -128,8 +138,7 @@ function parseScheduleTimes(scheduleOptions) {
       }
     }
   } else if (typeof interval === 'number') {
-    const timeStampMS = (interval * 1000);
-    if (timeStampMS <= now) return new Error(`Unix timestamp interval provided must not be in the past - you provided an interval of '${interval}'`);
+    if (interval <= now) return new Error(`Unix timestamp interval provided must not be in the past - you provided an interval of '${interval}'`);
 
     return {
       once: true,
@@ -202,7 +211,7 @@ function loadLuaScript(script) {
  * @returns {number}
  */
 function randomInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1) + min);
+  return Math.floor((Math.random() * ((max - min) + 1)) + min);
 }
 
 
