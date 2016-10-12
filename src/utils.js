@@ -119,13 +119,6 @@ function parseScheduleTimes(scheduleOptions) {
       _end = dateToUnixTimestamp(_end);
     }
 
-    if (!scheduleOptions.forwardDatesOnly) {
-      // if the start date is in the past then default to now
-      if (_start < now) _start = now;
-      // if the end date is in the past then default to now
-      if (_end && _end < now) _end = now;
-    }
-
     // if no ends prop was specified but we have 'times' then calculate the date
     // of the last occurrence
     if (!scheduleOptions.ends && _times) {
@@ -138,11 +131,18 @@ function parseScheduleTimes(scheduleOptions) {
           'Error getting occurrences based on number of times, no occurrences were returned for the number of times specified with the current date criteria.'
         );
       }
+
       _end = dateToUnixTimestamp(nextTimes[nextTimes.length - 1]);
+    }
+
+    if (scheduleOptions.forwardDatesOnly) {
+      // if the start date is in the past then default to now
+      if (_start < now) _start = now;
+      // if the end date is in the past then default to now
+      if (_end && _end < now) return new Error('The schedule you specified ends in the past and cannot be processed with "forwardDatesOnly" option enabled.');
     }
   } else if (typeof interval === 'number') {
     if (interval <= now) return new Error(`Unix timestamp interval provided must not be in the past - you provided an interval of '${interval}'`);
-
     return {
       once: true,
       next: interval,

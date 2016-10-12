@@ -215,4 +215,11 @@ describe('schedule parser', () => {
     assert.equal(schedule.ends, schedule.next + (60 * 4));
     done();
   });
+
+  it('Should return an error if there\'s no more times available', (done) => {
+    const fiveAgo = (dateToUnixTimestamp() - fiveMinute) - 1;
+    const schedule = parseScheduleTimes({ interval: 'every 1 minute', times: 3, starts: fiveAgo, forwardDatesOnly: true });
+    assert.equal(schedule instanceof Error, true);
+    done();
+  });
 });
