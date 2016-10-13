@@ -137,7 +137,8 @@ class Scheduler extends BaseHook {
       tryJSONStringify(schedule)
     ).then(() => {
       if (!schedule.enabled || !schedule.occurrence.next) return schedule;
-      return this._createNextOccurrence(schedule);
+      this._createNextOccurrence(schedule);
+      return schedule;
     });
   }
 
@@ -148,7 +149,7 @@ class Scheduler extends BaseHook {
    */
   destroy(name) {
     this.log.verbose(`create schedule '${name}'`);
-    return this.client.hdet(
+    return this.client.hdel(
       this._toKey('schedules'),
       name
     );
@@ -187,7 +188,7 @@ class Scheduler extends BaseHook {
     schedule.versionHash = this._createOccurrenceHash(schedule);
     return this.findOne(schedule.name).then((existing) => {
       if (!existing) return this.create(schedule);
-      if (createOnly) return Promise.resolve();
+      if (createOnly) return Promise.resolve(existing);
       this.log.debug('Found existing schedule', existing);
       return this.update(schedule, existing, validation);
     });
@@ -215,7 +216,7 @@ class Scheduler extends BaseHook {
    * @private
    */
   _createNextOccurrence(schedule) {
-    if (schedule.enabled && (!schedule.occurrence.endInput || schedule.lastRan <= schedule.occurrence.ends) && schedule.occurrence.laterSchedule) {
+    if (schedule.enabled && (!schedule.occurrence.endInput || schedule.lastRan <= schedule.occurrence.ends) && !schedule.occurrence.onceCompleted) {
       let next = schedule.lastRan;
 
       if (!next) {
@@ -270,16 +271,18 @@ class Scheduler extends BaseHook {
   _runSchedule(schedule, fromMulti) {
     // ignore schedules from multi event if the event origin is the same as this instance
     if (fromMulti && schedule.coreId === this.core.id) return null;
-    schedule.now = dateToUnixTimestamp() + 1;
-
-    // create the next occurrence - we do this before and after a job runs just tobe sure
-    // they can't duplicate so no harm in doing this.
-    if (!fromMulti) this._createNextOccurrence(schedule);
-
     // if we're a 'multi' instance schedule tell other workers to run the same schedule
     if (!fromMulti && schedule.multi) {
       this.core.pubsub.publish(this.toEventName('runMultiJob'), Object.assign({ coreId: this.core.id }, schedule));
     }
+
+    schedule.now = dateToUnixTimestamp() + 1;
+    schedule.fromMulti = fromMulti || false;
+
+    // create the next occurrence - we do this before and after a job runs just to
+    // be sure - they can't duplicate so no harm in doing this twice
+    if (!fromMulti && !schedule.occurrence.onceCompleted) this._createNextOccurrence(schedule);
+
 
     // validate the 'runs' property and make sure it eventually leads to a function
     if (!schedule.runs) return this.log.error(new Error(`Schedule is missing a runs parameter - ${JSON.stringify(schedule)}`));
@@ -479,8 +482,8 @@ class Scheduler extends BaseHook {
   _onScheduleSuccess(schedule) {
     this.log.info(`${new Date(schedule.lastRan * 1000).toISOString()}: Schedule '${schedule.name}' ${schedule.data ? JSON.stringify(schedule.data) : ''} has completed successfully.`);
     this._completeOccurrence(schedule);
-    if (!schedule.enabled) return schedule;
-    return this._createNextOccurrence(schedule);
+    if (schedule.enabled && !schedule.fromMulti && !schedule.occurrence.onceCompleted) return this._createNextOccurrence(schedule);
+    return null;
   }
 
   /**
@@ -492,8 +495,8 @@ class Scheduler extends BaseHook {
     this.log.error(`${new Date().toISOString()}: Schedule '${schedule.name}' ${schedule.data ? JSON.stringify(schedule.data) : ''} has failed to complete.`);
     this.log.error(error);
     this._completeOccurrence(schedule);
-    if (!schedule.enabled) return schedule;
-    return this._createNextOccurrence(schedule);
+    if (schedule.enabled && !schedule.fromMulti && !schedule.occurrence.onceCompleted) return this._createNextOccurrence(schedule);
+    return null;
   }
 
   /**

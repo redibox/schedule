@@ -43,17 +43,19 @@ if occurrences then
       local nextTimestamp = tonumber(scheduleParsed.occurrence.next)
       local endTimestamp = tonumber(scheduleParsed.occurrence.ends)
       local startsTimestamp = tonumber(scheduleParsed.occurrence.starts)
+      local runOnce = (scheduleParsed.occurrence.once and not scheduleParsed.occurrence.onceCompleted)
 
       -- only valid if schedule is enabled still
+      -- and it's hash matches the hash at time of creating this occurrence
       if enabled and versionHash == scheduleVersionHash then
         -- check this occurence is not > end timestamp
-        if scheduleParsed.occurrence.once or (nextTimestamp <= endTimestamp and nextTimestamp >= startsTimestamp) then
+        if runOnce or (nextTimestamp <= endTimestamp and nextTimestamp >= startsTimestamp) then
           -- update number of times ran counter
           scheduleParsed.timesRan = scheduleParsed.timesRan + 1
           scheduleParsed.lastRan = time
 
-          if scheduleParsed.occurrence.once then
-            scheduleParsed.occurrence.once = false
+          if runOnce then
+            scheduleParsed.occurrence.onceCompleted = true
           end
 
           -- re-encode json and update hash

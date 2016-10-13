@@ -115,27 +115,28 @@ function parseScheduleTimes(scheduleOptions) {
       if (endDate.length && endDate[0].start) _end = dateToUnixTimestamp(endDate[0].start.date());
       else return new Error(`Error parsing 'until' value of '${_end}'. Did you forget to use a keyword such as 'in'?`);
     } else if (_end && Object.prototype.toString.call(_end) === '[object Date]') {
-      // user provided a date - convert it to a timestamp
-      _end = dateToUnixTimestamp(_end);
+      _end = dateToUnixTimestamp(_end); // user provided a date - convert it to a timestamp
     }
 
     // if no ends prop was specified but we have 'times' then calculate the date
     // of the last occurrence
     if (!scheduleOptions.ends && _times) {
-      // get the next interval occurrence
-      const startDate = dateFromUnixTimestamp(_start);
+      const startDate = dateFromUnixTimestamp(_start - 1);
+      // add an additional time in case later returns the current timestamp as the first occurrence
       const nextTimes = later.schedule(schedule).next(_times + 1, startDate);
-      let shifted = false;
       if (nextTimes && nextTimes[0].getTime() === startDate.getTime()) {
+        // remove the current time as as the first occurrence
         nextTimes.shift();
-        shifted = true;
+      } else {
+        // remove the unnecessary occurrence
+        nextTimes.pop();
       }
       if (!nextTimes) {
         return new Error(
           'Error getting occurrences based on number of times, no occurrences were returned for the number of times specified with the current date criteria.'
         );
       }
-      _end = dateToUnixTimestamp(nextTimes[nextTimes.length - (shifted ? 2 : 1)]);
+      _end = dateToUnixTimestamp(nextTimes[nextTimes.length - 1]);
     }
 
     if (scheduleOptions.forwardDatesOnly) {
@@ -148,8 +149,9 @@ function parseScheduleTimes(scheduleOptions) {
     if (interval <= now) return new Error(`Unix timestamp interval provided must not be in the past - you provided an interval of '${interval}'`);
     return {
       once: true,
+      onceCompleted: false,
       next: interval,
-      ends: interval,
+      ends: interval + 1,
       starts: interval,
       intervalInput: interval,
       endHuman: dateFromUnixTimestamp(interval).toISOString(),
@@ -179,7 +181,7 @@ function parseScheduleTimes(scheduleOptions) {
     endHuman: _end ? dateFromUnixTimestamp(_end).toISOString() : 'No End Date',
     startHuman: dateFromUnixTimestamp(_start).toISOString(),
     nextHuman: next.toISOString(),
-    times: _times,
+    times: _times || -1,
   };
 }
 
