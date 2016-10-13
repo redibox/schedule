@@ -224,13 +224,9 @@ class Scheduler extends BaseHook {
         if (!schedule.now) schedule.now = dateToUnixTimestamp();
         const startDate = schedule.occurrence.starts < schedule.now ? new Date((schedule.now - 1) * 1000) : new Date((schedule.occurrence.starts - 1) * 1000);
         next = later.schedule(schedule.occurrence.laterSchedule).next(2, startDate, schedule.occurrence.endInput ? new Date(schedule.occurrence.ends * 1000) : null);
+        if (next && next[0].getTime() === startDate.getTime()) next.shift();
         if (!next || !next.length) return;
-        if (next[0].getTime() === startDate.getTime()) {
-          next = next[1];
-        } else {
-          next = next[0];
-        }
-        if (!next) return;
+        next = next[0];
         next = dateToUnixTimestamp(next);
       }
 

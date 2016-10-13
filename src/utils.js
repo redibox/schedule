@@ -123,16 +123,19 @@ function parseScheduleTimes(scheduleOptions) {
     // of the last occurrence
     if (!scheduleOptions.ends && _times) {
       // get the next interval occurrence
-      const startDate = dateFromUnixTimestamp(_start - 1);
+      const startDate = dateFromUnixTimestamp(_start);
       const nextTimes = later.schedule(schedule).next(_times + 1, startDate);
-      if (nextTimes && nextTimes[0].getTime() === startDate.getTime()) nextTimes.shift();
+      let shifted = false;
+      if (nextTimes && nextTimes[0].getTime() === startDate.getTime()) {
+        nextTimes.shift();
+        shifted = true;
+      }
       if (!nextTimes) {
         return new Error(
           'Error getting occurrences based on number of times, no occurrences were returned for the number of times specified with the current date criteria.'
         );
       }
-
-      _end = dateToUnixTimestamp(nextTimes[nextTimes.length - 1]);
+      _end = dateToUnixTimestamp(nextTimes[nextTimes.length - (shifted ? 2 : 1)]);
     }
 
     if (scheduleOptions.forwardDatesOnly) {
@@ -158,17 +161,12 @@ function parseScheduleTimes(scheduleOptions) {
   }
 
   // get the next interval occurrence
-  const startDate = dateFromUnixTimestamp(_start - 1);
   // we need to get next 2 occurrences as later counts the current time as valid in most cases
+  const startDate = dateFromUnixTimestamp(_start - 1);
   let next = later.schedule(schedule).next(2, startDate, _end ? dateFromUnixTimestamp(_end) : null);
+  if (next && next[0].getTime() === startDate.getTime()) next.shift();
   if (!next || !next.length) return new Error('No more occurrences possible, are the start and end strings correct?');
-  // if the first occurrence is the same as the time now then use the 2nd occurrence
-  if (next[0].getTime() === startDate.getTime()) {
-    next = next[1];
-  } else {
-    next = next[0];
-  }
-  if (!next) return new Error('No more occurrences possible, are the start and end strings correct?');
+  next = next[0];
 
   return {
     laterSchedule: schedule,
@@ -183,16 +181,6 @@ function parseScheduleTimes(scheduleOptions) {
     nextHuman: next.toISOString(),
     times: _times,
   };
-}
-
-/**
- *
- * @param schedule
- * @returns {*}
- */
-function nextOccurrence(schedule) {
-  if (schedule.ends && schedule.ends < getUnixTimestamp()) return null;
-  return later.schedule(schedule.laterSchedule).next(1, new Date(), schedule.ends ? dateFromUnixTimestamp(schedule.ends) : null);
 }
 
 /**
@@ -279,6 +267,5 @@ module.exports.microTime = microTime;
 module.exports.dateToUnixTimestamp = dateToUnixTimestamp;
 module.exports.dateFromUnixTimestamp = dateFromUnixTimestamp;
 module.exports.parseScheduleTimes = parseScheduleTimes;
-module.exports.nextOccurrence = nextOccurrence;
 module.exports.loadLuaScript = loadLuaScript;
 module.exports.ExponentialRetries = ExponentialRetries;

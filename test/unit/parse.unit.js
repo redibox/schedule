@@ -33,6 +33,13 @@ describe('schedule parser', () => {
     done();
   });
 
+  it('Should return an error if invalid interval type provided', (done) => {
+    const schedule = parseScheduleTimes({ interval: true });
+    assert.equal(schedule instanceof Error, true);
+    assert.equal(schedule.message, 'Invalid interval attribute provided.');
+    done();
+  });
+
   it('Should error if interval timestamp is in the past (for single run jobs)', (done) => {
     const inFive = (dateToUnixTimestamp() - fiveMinute) - 1;
     const schedule = parseScheduleTimes({ interval: inFive });
@@ -218,7 +225,12 @@ describe('schedule parser', () => {
 
   it('Should return an error if there\'s no more times available', (done) => {
     const fiveAgo = (dateToUnixTimestamp() - fiveMinute) - 1;
-    const schedule = parseScheduleTimes({ interval: 'every 1 minute', times: 3, starts: fiveAgo, forwardDatesOnly: true });
+    const schedule = parseScheduleTimes({
+      interval: 'every 1 minute',
+      times: 3,
+      starts: fiveAgo,
+      forwardDatesOnly: true,
+    });
     assert.equal(schedule instanceof Error, true);
     done();
   });
