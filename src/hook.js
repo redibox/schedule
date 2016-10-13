@@ -98,15 +98,16 @@ class Scheduler extends BaseHook {
    * -------------
    */
 
-  start() {
-    // todo pubsub to other workers so that they start also
-    this._beginWorking();
-  }
-
-  stop() {
-    // todo pubsub to other workers so that they stop also
-    this._stopWorking();
-  }
+  // TODO start stop
+  // start() {
+  //   // todo pubsub to other workers so that they start also
+  //   this._beginWorking();
+  // }
+  //
+  // stop() {
+  //   // todo pubsub to other workers so that they stop also
+  //   this._stopWorking();
+  // }
 
   findOne(name) {
     return this.client.hget(
@@ -118,11 +119,16 @@ class Scheduler extends BaseHook {
     });
   }
 
-  find() {
-    return this.client.hgetall(
-      this._toKey('schedules')
-    );
-  }
+  // TODO find schedule api
+  // /**
+  //  *
+  //  * @returns {*}
+  //  */
+  // find() {
+  //   return this.client.hgetall(
+  //     this._toKey('schedules')
+  //   );
+  // }
 
   /**
    *
@@ -155,9 +161,10 @@ class Scheduler extends BaseHook {
     );
   }
 
-  update(schedule) {
-    this.log.verbose(`update schedule '${schedule.name}'`);
-  }
+  // TODO updater logic
+  // update(schedule) {
+  //   this.log.verbose(`update schedule '${schedule.name}'`);
+  // }
 
   /**
    *
@@ -189,8 +196,10 @@ class Scheduler extends BaseHook {
     return this.findOne(schedule.name).then((existing) => {
       if (!existing) return this.create(schedule);
       if (createOnly) return Promise.resolve(existing);
-      this.log.debug('Found existing schedule', existing);
-      return this.update(schedule, existing, validation);
+      return Promise.resolve(existing);
+      // TODO updater logic
+      // this.log.debug('Found existing schedule', existing);
+      // return this.update(schedule, existing, validation);
     });
   }
 
@@ -394,12 +403,12 @@ class Scheduler extends BaseHook {
    *
    * @private
    */
-  _stopWorking() {
-    clearTimeout(this.processTimer);
-    clearTimeout(this.flushDetectorTimer);
-    this.state = 'stopped';
-    this.lastTick = null;
-  }
+  // TODO stop process - also reset exporetries
+  // _stopWorking() {
+  //   clearTimeout(this.processTimer);
+  //   this.state = 'stopped';
+  //   this.lastTick = null;
+  // }
 
   /**
    *

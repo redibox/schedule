@@ -4,6 +4,7 @@ const { getTimeStamp } = require('redibox');
 
 const { readFileSync } = require('fs');
 const { resolve } = require('path');
+
 const containsAlphaCharsRegex = /[a-z:]/i;
 
 /**
@@ -11,9 +12,10 @@ const containsAlphaCharsRegex = /[a-z:]/i;
  * @param timestamp
  * @returns {boolean}
  */
-function isValidTimestamp(timestamp) {
-  return (new Date(timestamp)).getTime() > 0;
-}
+// TODO timestamp validation on input
+// function isValidTimestamp(timestamp) {
+//   return (new Date(timestamp)).getTime() > 0;
+// }
 
 /**
  * Returns a timestamp in seconds
