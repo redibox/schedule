@@ -19,7 +19,7 @@ const config = {
     enabled: true,
     schedules: [
       {
-        name: 'every5secs',
+        name: 'in1minuteEvery5seconds',
         runs: 'some.coolFunction',
         interval: 'every 5 seconds',
         starts: 'in 1 minute',
