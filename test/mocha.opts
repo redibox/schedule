@@ -1,5 +1,5 @@
 --reporter spec
 --recursive
 
-test/**/*.spec.js
 test/**/*.unit.js
+test/**/*.spec.js

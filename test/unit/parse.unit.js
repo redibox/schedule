@@ -62,7 +62,7 @@ describe('schedule parser', () => {
 
     // now check starts prop
     assert.isNumber(schedule.starts, 'starts property is not a valid timestamp');
-    assert.equal(schedule.starts, inFive);
+    assert.approximately(schedule.starts, inFive, 1);
     done();
   });
 
@@ -86,14 +86,14 @@ describe('schedule parser', () => {
   it('Should default to now if no starts property provided', (done) => {
     const now = dateToUnixTimestamp();
     const schedule = parseScheduleTimes({ interval: 'every 1 seconds' });
-    assert.equal(schedule.next, now);
+    assert.approximately(schedule.next, now, 1);
     assert.isString(schedule.endHuman);
     assert.isString(schedule.startHuman);
     assert.isString(schedule.nextHuman);
 
     // now check starts prop
     assert.isNumber(schedule.starts, 'starts property is not a valid timestamp');
-    assert.equal(schedule.starts, now);
+    assert.approximately(schedule.starts, now, 1);
     done();
   });
 
@@ -170,7 +170,7 @@ describe('schedule parser', () => {
 
     // now check starts prop
     assert.isNumber(schedule.ends, 'ends property is not a valid timestamp');
-    assert.equal(schedule.ends, inFive);
+    assert.approximately(schedule.ends, inFive, 1);
     done();
   });
 
@@ -219,7 +219,7 @@ describe('schedule parser', () => {
 
     // now check ends prop
     assert.isNumber(schedule.ends, 'ends property is not a valid timestamp');
-    assert.equal(schedule.ends, schedule.next + (60 * 4));
+    assert.approximately(schedule.ends, schedule.next + (60 * 4), 1);
     done();
   });
 
