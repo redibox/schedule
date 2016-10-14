@@ -15,21 +15,49 @@ global.some = {
 
 const config = {
   hooks: {},
+  redis: {
+    connectionTimeout: 2000,
+    hosts: [
+      {
+        host: '127.0.0.1',
+        port: 30001,
+      },
+      {
+        host: '127.0.0.1',
+        dropBufferSupport: true,
+        port: 30002,
+      },
+      {
+        host: '127.0.0.1',
+        port: 30003,
+      },
+      {
+        host: '127.0.0.1',
+        port: 30004,
+      },
+      {
+        host: '127.0.0.1',
+        port: 30005,
+      },
+      {
+        host: '127.0.0.1',
+        port: 30006,
+      },
+    ],
+  },
   schedule: {
     enabled: true,
     schedules: [
-      {
-        name: 'in1minuteEvery5seconds',
-        runs: 'some.coolFunction',
-        interval: 'every 5 seconds',
-        starts: 'in 1 minute',
-        times: 3,
-      },
       // {
-      //   name: 'every1sec',
+      //   name: 'in1minuteEvery5seconds',
       //   runs: 'some.coolFunction',
       //   interval: 'every 1 seconds',
       // },
+      {
+        name: 'every1sec',
+        runs: 'some.coolFunction',
+        interval: 'every 1 seconds',
+      },
       // {
       //   name: 'every3sec',
       //   runs: 'some.coolFunction',
@@ -57,7 +85,7 @@ const config = {
       // },
     ],
   },
-  log: { level: 'verbose' },
+  // log: { level: 'verbose' },
 };
 config.hooks[global.HOOK_NAME] = UserHook;
 //

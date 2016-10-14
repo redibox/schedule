@@ -13,7 +13,7 @@
   "globals": {
     "describe": true,
     "RediBox": true,
-    "RediBoxCluster": true,
+    "RediBoxClustered": true,
     "HOOK_NAME": true,
     "beforeEach": true,
     "Hook": true,

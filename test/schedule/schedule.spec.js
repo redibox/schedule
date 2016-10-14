@@ -11,7 +11,7 @@ describe('schedule runner', () => {
       ends: 'in 4 seconds',
     };
 
-    Hook.createOrUpdate(schedule).then(() => {
+    this.test.hook.createOrUpdate(schedule).then(() => {
       done('Schedule should have rejected.');
     }).catch((error) => {
       assert.instanceOf(error, Error);
@@ -27,7 +27,7 @@ describe('schedule runner', () => {
       ends: 'in 4 seconds',
     };
 
-    Hook.createOrUpdate(schedule).then(() => {
+    this.test.hook.createOrUpdate(schedule).then(() => {
       done('Schedule should have rejected.');
     }).catch((error) => {
       assert.instanceOf(error, Error);
@@ -42,7 +42,7 @@ describe('schedule runner', () => {
       runs: 'potato',
     };
 
-    Hook.createOrUpdate(schedule).then(() => {
+    this.test.hook.createOrUpdate(schedule).then(() => {
       done('Schedule should have rejected.');
     }).catch((error) => {
       assert.instanceOf(error, Error);
@@ -51,7 +51,7 @@ describe('schedule runner', () => {
     });
   });
 
-  it('Should run repeat schedules with an interval', function (done) {
+  it('... Should run repeat schedules with an interval', function (done) {
     this.timeout(6000);
     this.slow(3000);
     let count = 0;
@@ -72,12 +72,12 @@ describe('schedule runner', () => {
       count += 1;
       assert.equal(sched.timesRan, count);
       if (count === 2) {
-        return Hook.destroy(schedule.name).then(() => done());
+        return this.test.hook.destroy(schedule.name).then(() => done());
       }
       return Promise.resolve();
     };
 
-    Hook.createOrUpdate(schedule).then((created) => {
+    this.test.hook.createOrUpdate(schedule).then((created) => {
       assert.isObject(created);
       assert.equal(created.name, schedule.name);
       assert.isObject(created.occurrence);
@@ -85,7 +85,7 @@ describe('schedule runner', () => {
     });
   });
 
-  it('Should run a schedule once at a specified timestamp', function (done) {
+  it('... Should run a schedule once at a specified timestamp', function (done) {
     this.timeout(5000);
     this.slow(5000);
     const when = dateToUnixTimestamp() + 2;
@@ -102,17 +102,17 @@ describe('schedule runner', () => {
       assert.equal(sched.name, schedule.name);
       assert.equal(sched.timesRan, 1);
       assert.equal(when, dateToUnixTimestamp());
-      return Hook.destroy(schedule.name).then(() => done());
+      return this.test.hook.destroy(schedule.name).then(() => done());
     };
 
-    Hook.createOrUpdate(schedule).then((created) => {
+    this.test.hook.createOrUpdate(schedule).then((created) => {
       assert.isObject(created);
       assert.equal(created.name, schedule.name);
       assert.isObject(created.occurrence);
     });
   });
 
-  it('Should run a schedule with an interval for a specific amount of times', function (done) {
+  it('... Should run a schedule with an interval for a specific amount of times', function (done) {
     this.timeout(6000);
     this.slow(5000);
     let count = 0;
@@ -129,7 +129,7 @@ describe('schedule runner', () => {
       count += 1;
       assert.equal(sched.timesRan, count);
       if (count === 2) {
-        setTimeout(() => Hook.destroy(schedule.name).then(() => done()), 1200);
+        setTimeout(() => this.test.hook.destroy(schedule.name).then(() => done()), 1200);
       }
       if (count === 3) {
         return done('Times test failed, test ran more than the specified number of times.');
@@ -137,14 +137,14 @@ describe('schedule runner', () => {
       return Promise.resolve();
     };
 
-    Hook.createOrUpdate(schedule).then((created) => {
+    this.test.hook.createOrUpdate(schedule).then((created) => {
       assert.isObject(created);
       assert.equal(created.name, schedule.name);
       assert.isObject(created.occurrence);
     });
   });
 
-  it('Should run a schedule with an interval ending at a specific time', function (done) {
+  it('... Should run a schedule wiitc an interval ending at a specific time', function (done) {
     this.timeout(7000);
     this.slow(7000);
     let count = 0;
@@ -161,7 +161,7 @@ describe('schedule runner', () => {
       count += 1;
       assert.equal(sched.timesRan, count);
       if (count === 3) {
-        setTimeout(() => Hook.destroy(schedule.name).then(() => done()), 1500);
+        setTimeout(() => this.test.hook.destroy(schedule.name).then(() => done()), 1500);
       }
       if (count === 4) {
         return done('Times test failed, test ran more than the specified number of times.');
@@ -169,14 +169,14 @@ describe('schedule runner', () => {
       return Promise.resolve();
     };
 
-    Hook.createOrUpdate(schedule).then((created) => {
+    this.test.hook.createOrUpdate(schedule).then((created) => {
       assert.isObject(created);
       assert.equal(created.name, schedule.name);
       assert.isObject(created.occurrence);
     });
   });
 
-  it('Should run a schedule with start and end times specified', function (done) {
+  it('... Should run a schedule wiitc start and end times specified', function (done) {
     this.timeout(10000);
     this.slow(9000);
     let count = 0;
@@ -197,7 +197,7 @@ describe('schedule runner', () => {
       count += 1;
       assert.equal(sched.timesRan, count);
       if (count === 2) {
-        setTimeout(() => Hook.destroy(schedule.name).then(() => done()), 1500);
+        setTimeout(() => this.test.hook.destroy(schedule.name).then(() => done()), 1500);
       }
       if (count === 3) {
         return done('Times test failed, test ran more than the specified number of times.');
@@ -205,10 +205,27 @@ describe('schedule runner', () => {
       return Promise.resolve();
     };
 
-    Hook.createOrUpdate(schedule).then((created) => {
+    this.test.hook.createOrUpdate(schedule).then((created) => {
       assert.isObject(created);
       assert.equal(created.name, schedule.name);
       assert.isObject(created.occurrence);
     });
+  });
+
+  it('... Should create and run default schedules', function (done) {
+    this.timeout(6000);
+    this.slow(3000);
+    let count = 0;
+
+    global.defaultScheduleRunner = (sched) => {
+      assert.isObject(sched);
+      assert.equal(sched.name, 'everySecDefaultFunc');
+      count += 1;
+      if (count === 2) {
+        done();
+        return global.defaultScheduleRunner = null;
+      }
+      return Promise.resolve();
+    };
   });
 });
