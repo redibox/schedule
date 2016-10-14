@@ -80,7 +80,7 @@ end
 
 -- set lock to expire after half the interval time
 if redis.call('get', KEYS[5]) == ARGV[3] then
-  redis.debug('EXIRING KEY ' .. KEYS[5] .. ' with token ' .. ARGV[3])
+--  redis.debug('EXIRING KEY ' .. KEYS[5] .. ' with token ' .. ARGV[3])
   redis.call('pexpire', KEYS[5], tonumber(ARGV[4]) - 10)
 end
 
