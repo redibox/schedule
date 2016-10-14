@@ -49,11 +49,19 @@ class Scheduler extends BaseHook {
   initialize() {
     this.exponenRetry.create('doWorkError', this.options.processInterval, 45, 0.5);
     this.exponenRetry.create('doWorkLock', this.options.processInterval, 15, 0.1);
+
     if (this.options.enabled) {
-      this.createClient('block');
-      this.on(this.toEventName('client:block:ready'), this._beginWorking.bind(this));
-      this.core.pubsub.subscribe(this.toEventName('runMultiJob'), this._runMultiSchedule.bind(this));
-      return this._createDefaultSchedules();
+      this.on('core:ready', () => {
+        // create all default schedules
+        this._createDefaultSchedules();
+
+        // subscribe to multi node schedule events
+        this.core.pubsub.subscribe(this.toEventName('runMultiJob'), this._runMultiSchedule.bind(this));
+
+        // creating blocking client for internal work queue
+        this.createClient('block');
+        this.on(this.toEventName('client:block:ready'), this._beginWorking.bind(this));
+      });
     }
 
     return Promise.resolve();
@@ -141,7 +149,7 @@ class Scheduler extends BaseHook {
       this._toKey('schedules'),
       schedule.name,
       tryJSONStringify(schedule)
-    ).then(() => {
+    ).then((val) => {
       if (!schedule.enabled || !schedule.occurrence.next) return schedule;
       this._createNextOccurrence(schedule);
       return schedule;
@@ -302,7 +310,7 @@ class Scheduler extends BaseHook {
 
     // exec schedule runner
     const possiblePromise = runner(schedule);
-    if (!possiblePromise.then) {
+    if (!possiblePromise || !possiblePromise.then) {
       // stinky error check
       if (possiblePromise && possiblePromise.stack) return this._onScheduleFailure(possiblePromise, schedule);
       return this._onScheduleSuccess(schedule);
@@ -444,8 +452,8 @@ class Scheduler extends BaseHook {
             this.log.debug(`Work script ran and moved ${result[0]} occurrences in ${this.lastTickTimeTaken}ms.`);
             this.exponenRetry.reset('doWorkLock');
 
-            // flush detection
-            if (result[1] === 'OK') {
+            // flush detection - seems to be a bug in ioredis where if cluster it sometimes returns the result as a buffer
+            if (result[1] === 'OK' || (Buffer.isBuffer(result[1]) && result[1].toString() === 'OK')) {
               this.log.verbose('Uh-oh, looks like something has been flushed on redis, recreating all default schedules.');
               this._createDefaultSchedules();
             }
