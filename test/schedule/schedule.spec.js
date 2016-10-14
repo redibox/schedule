@@ -144,7 +144,7 @@ describe('schedule runner', () => {
     });
   });
 
-  it('... Should run a schedule wiitc an interval ending at a specific time', function (done) {
+  it('... Should run a schedule with an interval ending at a specific time', function (done) {
     this.timeout(7000);
     this.slow(7000);
     let count = 0;
@@ -176,7 +176,7 @@ describe('schedule runner', () => {
     });
   });
 
-  it('... Should run a schedule wiitc start and end times specified', function (done) {
+  it('... Should run a schedule with start and end times specified', function (done) {
     this.timeout(10000);
     this.slow(9000);
     let count = 0;
