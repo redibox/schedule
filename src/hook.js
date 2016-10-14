@@ -56,7 +56,7 @@ class Scheduler extends BaseHook {
         this._createDefaultSchedules();
 
         // subscribe to multi node schedule events
-        this.core.pubsub.subscribe(this.toEventName('runMultiJob'), this._runMultiSchedule.bind(this));
+        this.core.pubsub.subscribe(this.toEventName('runMultiJob'), this._onMultiScheduleEvent.bind(this));
 
         // creating blocking client for internal work queue
         this.createClient('block');
@@ -76,11 +76,11 @@ class Scheduler extends BaseHook {
     const promises = [];
     if (this.options.schedules && this.options.schedules.length) {
       for (let i = 0, len = this.options.schedules.length; i < len; i += 1) {
-        promises.push(this.createOrUpdate(this.options.schedules[i], true));
+        promises.push(this.createOrUpdate(Object.assign({}, this.options.schedules[i], { default: true }), true));
       }
     }
 
-    return promises.length ? Promise.all(promises) : Promise.resolve();
+    return Promise.all(promises);
   }
 
   // noinspection JSUnusedGlobalSymbols,JSMethodCanBeStatic
@@ -181,7 +181,7 @@ class Scheduler extends BaseHook {
    */
   validate(schedule) {
     if (!schedule.name) return new Error('Missing schedule name.');
-    if (!schedule.runs) return new Error('Missing schedule \'runs\' property.');
+    if (!schedule.runs || typeof schedule.runs !== 'string') return new Error('Missing schedule \'runs\' string property.');
     if (!schedule.interval) return new Error('Missing schedule \'interval\' property.');
     return parseScheduleTimes(schedule);
   }
@@ -270,12 +270,18 @@ class Scheduler extends BaseHook {
         }
       );
     } else {
+      // TODO don't think it'll actually ever get here?
       this.log.verbose(`Schedule '${schedule.name}' has expired or is no longer enabled. { enabled: ${schedule.enabled}, ends: ${schedule.occurrence.ends} }`);
     }
   }
 
-  _runMultiSchedule(schedule) {
-    this._runSchedule(schedule, true);
+  /**
+   *
+   * @param event
+   * @private
+   */
+  _onMultiScheduleEvent(event) {
+    this._runSchedule(event.data, true);
   }
 
   /**
@@ -300,26 +306,30 @@ class Scheduler extends BaseHook {
     // be sure - they can't duplicate so no harm in doing this twice
     if (!fromMulti && !schedule.occurrence.onceCompleted) this._createNextOccurrence(schedule);
 
+    const runner = deepGet(global, schedule.runs);
 
-    // validate the 'runs' property and make sure it eventually leads to a function
-    if (!schedule.runs) return this.log.error(new Error(`Schedule is missing a runs parameter - ${JSON.stringify(schedule)}`));
-    const runner = typeof schedule.runs === 'string' ? deepGet(global, schedule.runs) : schedule.runs;
     if (!isFunction(runner)) {
-      return this.log.error(`Schedule invalid, expected a function or a global string dot notated path to a function - ${JSON.stringify(schedule)}`);
+      return this._onScheduleFailure.bind(
+        this, schedule,
+        new Error(`Schedule invalid, expected a function or a global string dot notated path to a function - ${JSON.stringify(schedule)}`)
+      )();
     }
 
     // exec schedule runner
+    // TODO try catcher
     const possiblePromise = runner(schedule);
+
     if (!possiblePromise || !possiblePromise.then) {
-      // stinky error check
-      if (possiblePromise && possiblePromise.stack) return this._onScheduleFailure(possiblePromise, schedule);
+      // stinky error check - TODO improve?
+      if (possiblePromise && possiblePromise.stack) return this._onScheduleFailure(schedule, possiblePromise);
       return this._onScheduleSuccess(schedule);
     }
 
-    // if a promise is detected as a return then exec it
-    return possiblePromise
-      .then(this._onScheduleSuccess.bind(this, schedule), this._onScheduleFailure.bind(this, schedule))
-      .catch(this._onScheduleFailure.bind(this, schedule));
+    // if a promise is detected
+    return possiblePromise.then(
+      this._onScheduleSuccess.bind(this, schedule),
+      this._onScheduleFailure.bind(this, schedule)
+    ).catch(this._onScheduleFailure.bind(this, schedule));
   }
 
   /**
@@ -475,6 +485,8 @@ class Scheduler extends BaseHook {
    * @param schedule
    * @private
    */
+  // TODO - add result arg and track schedule completions with a capped list
+  // TODO - 2nd arg is success result, 3rd arg is error if it failed
   _completeOccurrence(schedule) {
     if (schedule.occurrenceKey) {
       this.client.completeoccurrence(
@@ -495,10 +507,19 @@ class Scheduler extends BaseHook {
   /**
    *
    * @param schedule
+   * @param result
    */
-  _onScheduleSuccess(schedule) {
-    this.log.info(`${new Date(schedule.lastRan * 1000).toISOString()}: Schedule '${schedule.name}' ${schedule.data ? JSON.stringify(schedule.data) : ''} has completed successfully.`);
-    this._completeOccurrence(schedule);
+  _onScheduleSuccess(schedule, result) {
+    // const hasListeners = this.listenerCount('onScheduleSuccess') > 0;
+    if (!this.listeners('onScheduleFailure', true)) {
+      this.log.info(`${new Date(schedule.lastRan * 1000).toISOString()}: Schedule '${schedule.name}' ${schedule.data ? JSON.stringify(schedule.data) : ''} has completed successfully.`);
+    } else {
+      this.emit('onScheduleSuccess', {
+        schedule,
+        result,
+      });
+    }
+    this._completeOccurrence(schedule, result, null);
     if (schedule.enabled && !schedule.fromMulti && !schedule.occurrence.onceCompleted) return this._createNextOccurrence(schedule);
     return null;
   }
@@ -509,9 +530,17 @@ class Scheduler extends BaseHook {
    * @param error
    */
   _onScheduleFailure(schedule, error) {
-    this.log.error(`${new Date().toISOString()}: Schedule '${schedule.name}' ${schedule.data ? JSON.stringify(schedule.data) : ''} has failed to complete.`);
-    this.log.error(error);
-    this._completeOccurrence(schedule);
+    // const hasListeners = this.listeners('onScheduleFailure', true);
+    if (!this.listeners('onScheduleFailure', true)) {
+      this.log.error(`${new Date().toISOString()}: Schedule '${schedule.name}' ${schedule.data ? JSON.stringify(schedule.data) : ''} has failed to complete.`);
+      this.log.error(error);
+    } else {
+      this.emit('onScheduleFailure', {
+        schedule,
+        error,
+      });
+    }
+    this._completeOccurrence(schedule, null, error);
     if (schedule.enabled && !schedule.fromMulti && !schedule.occurrence.onceCompleted) return this._createNextOccurrence(schedule);
     return null;
   }
