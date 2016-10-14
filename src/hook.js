@@ -149,7 +149,7 @@ class Scheduler extends BaseHook {
       this._toKey('schedules'),
       schedule.name,
       tryJSONStringify(schedule)
-    ).then((val) => {
+    ).then(() => {
       if (!schedule.enabled || !schedule.occurrence.next) return schedule;
       this._createNextOccurrence(schedule);
       return schedule;
